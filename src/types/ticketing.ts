@@ -179,6 +179,8 @@ export interface BusinessAccuracyKPIs {
   accuracyWithin10Pct: number;
   evaluatedMatchesCount: number;
   totalEvaluatedForecasts: number;
+  evaluatedModelVersions: string[];
+  headlineMethod: 'latest_forecast_per_match';
 }
 
 export interface ModelPerformanceData {
