@@ -1,8 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Info } from 'lucide-react';
-import { EnrichedEvent, ModelPerformanceData, ModelVersionMetric } from '../types/ticketing';
+import {
+  EnrichedEvent,
+  ModelPerformanceData,
+  ModelVersionMetric,
+  StrictHorizonPerformance
+} from '../types/ticketing';
 import { eventsService, isAllClubs } from '../services/eventsService';
 import { modelPerformanceService } from '../services/modelPerformanceService';
+import { strictHorizonService } from '../services/strictHorizonService';
 import { MetricCard } from '../components/common/MetricCard';
 import { HorizonPerformanceChart } from '../components/charts/HorizonPerformanceChart';
 import { formatNumber, formatPercent } from '../utils/formatters';
@@ -29,6 +35,7 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
   onClubFilterChange
 }) => {
   const [perfData, setPerfData] = useState<ModelPerformanceData | null>(null);
+  const [strictHorizon, setStrictHorizon] = useState<StrictHorizonPerformance | null>(null);
   const [completedEvents, setCompletedEvents] = useState<EnrichedEvent[]>([]);
   const [versionMetrics, setVersionMetrics] = useState<ModelVersionMetric[]>([]);
   const [clubs, setClubs] = useState<string[]>([]);
@@ -44,13 +51,15 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
       setIsLoading(true);
       try {
         const activeClub = isAllClubs(selectedClub) ? undefined : selectedClub;
-        const [perf, clubsList, completed, versions] = await Promise.all([
+        const [perf, strict, clubsList, completed, versions] = await Promise.all([
           eventsService.getModelPerformance({ club: activeClub }),
+          strictHorizonService.getPerformance(activeClub),
           eventsService.getClubsList(),
           eventsService.getEvents({ status: 'completed', club: activeClub }),
           modelPerformanceService.getVersionMetrics(activeClub)
         ]);
         setPerfData(perf);
+        setStrictHorizon(strict);
         setClubs(clubsList);
         setCompletedEvents(completed);
         setVersionMetrics(versions);
@@ -62,7 +71,7 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
     loadPerformance();
   }, [selectedClub]);
 
-  if (isLoading || !perfData) {
+  if (isLoading || !perfData || !strictHorizon) {
     return (
       <div className="py-24 text-center">
         <div className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
@@ -71,7 +80,8 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
     );
   }
 
-  const { businessKpis, horizonMetrics } = perfData;
+  const { businessKpis } = perfData;
+  const horizonMetrics = strictHorizon.horizonMetrics;
   const evaluableEvents = completedEvents.filter(
     (event) => event.outcome && event.currentForecast !== undefined
   );
@@ -115,6 +125,8 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
   const within10Strong = headlineKpis.accuracyWithin10Pct >= 80;
   const within10Moderate = headlineKpis.accuracyWithin10Pct >= 50;
   const populatedHorizons = horizonMetrics.filter((row) => row.forecastsCount > 0).length;
+  const strictForecastCount = horizonMetrics.reduce((sum, row) => sum + row.forecastsCount, 0);
+  const strictModelVersionLabel = strictHorizon.modelVersion || 'brak wersji do oceny';
   const modelVersionLabel = headlineKpis.modelVersions.length
     ? headlineKpis.modelVersions.join(', ')
     : 'brak wersji do oceny';
@@ -178,7 +190,7 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
             Trafność prognoz Beyond
           </h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Headline: ostatnia prognoza per mecz · wersje i horyzonty oceniane osobno
+            Headline: ostatnia prognoza per mecz · horyzonty: strict as-of, jedna prognoza per mecz
           </p>
         </div>
 
@@ -234,8 +246,8 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
         <MetricCard
           label="Ocenione mecze"
           value={headlineKpis.evaluatedMatchesCount}
-          subtext={`${businessKpis.totalEvaluatedForecasts} punktów do analizy horyzontów`}
-          tooltip="Headline używa jednej prognozy per mecz; wszystkie punkty służą wyłącznie do analizy horyzontów."
+          subtext={`${strictForecastCount} canonical punktów horyzontowych`}
+          tooltip="Headline używa jednej ostatniej prognozy per mecz. Horyzonty używają maksymalnie jednej prognozy per mecz i checkpoint."
           highlight={sampleTooSmall ? 'warning' : 'normal'}
         />
       </div>
@@ -300,12 +312,12 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
           <div>
             <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Jak zmienia się błąd wraz z czasem do meczu?</h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Wszystkie zweryfikowane punkty predykcji są używane tylko do analizy konkretnego horyzontu.
+              Strict as-of: dla każdego meczu i horyzontu wybieramy jedną prognozę najbliższą checkpointowi, ale nigdy wygenerowaną po nim.
             </p>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1 rounded">
             <Info className="w-3.5 h-3.5" />
-            <span>{businessKpis.totalEvaluatedForecasts} prognoz · {populatedHorizons} horyzontów z danymi</span>
+            <span>{strictModelVersionLabel} · {strictForecastCount} punktów · {populatedHorizons} horyzontów</span>
           </div>
         </div>
         <HorizonPerformanceChart metrics={horizonMetrics} />
@@ -313,15 +325,17 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
 
       <div className="space-y-3">
         <div>
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Dokładność według horyzontu czasowego</h2>
-          <p className="text-xs text-zinc-500">Zastosowania biznesowe są hipotezami do walidacji — nie gwarancją operacyjną.</p>
+          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Dokładność według canonical horizon</h2>
+          <p className="text-xs text-zinc-500">
+            Każdy mecz ma maksymalnie jedną obserwację w T-30, T-14, T-7, T-3 i T-24h; forecast po checkpointcie nie jest fallbackiem.
+          </p>
         </div>
         <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/75 dark:bg-zinc-900/50 text-zinc-500 font-medium">
                 <th className="py-3 px-4">Horyzont</th>
-                <th className="py-3 px-3 text-right">Prognozy</th>
+                <th className="py-3 px-3 text-right">Mecze</th>
                 <th className="py-3 px-3 text-right">MAE</th>
                 <th className="py-3 px-3 text-right">MAPE</th>
                 <th className="py-3 px-3 text-right">Bias</th>
@@ -330,12 +344,11 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
               {horizonMetrics.map((row) => {
-                let recommendation = 'Wczesna kalibracja popytu i planowanie kampanii';
-                if (row.horizon === '15–29 dni') recommendation = 'Planowanie kampanii reklamowej / social media';
-                if (row.horizon === '8–14 dni') recommendation = 'Planowanie ochrony, służb medycznych i cateringu';
-                if (row.horizon === '4–7 dni') recommendation = 'Promocje sektorowe i aktywacja bazy kibiców';
-                if (row.horizon === '1–3 dni') recommendation = 'Planowanie wejść i przepustowości bramek';
-                if (row.horizon === 'dzień eventu') recommendation = 'Końcowa estymacja frekwencji';
+                let recommendation = 'Wczesny plan popytu i budżetu kampanii';
+                if (row.horizon === 'T-14') recommendation = 'Planowanie kampanii i alokacji kanałów';
+                if (row.horizon === 'T-7') recommendation = 'Operacje meczowe, catering i aktywacja bazy';
+                if (row.horizon === 'T-3') recommendation = 'Promocje sektorowe i korekta działań';
+                if (row.horizon === 'T-24h') recommendation = 'Końcowa estymacja frekwencji i operacji';
                 return (
                   <tr key={row.horizon} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40 transition-colors">
                     <td className="py-3.5 px-4 font-semibold text-zinc-900 dark:text-zinc-100">{row.horizon}</td>
