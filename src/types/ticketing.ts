@@ -159,7 +159,12 @@ export type HorizonBucket =
   | '8–14 dni'
   | '4–7 dni'
   | '1–3 dni'
-  | 'dzień eventu';
+  | 'dzień eventu'
+  | 'T-30'
+  | 'T-14'
+  | 'T-7'
+  | 'T-3'
+  | 'T-24h';
 
 export interface HorizonMetric {
   horizon: HorizonBucket;
@@ -168,6 +173,12 @@ export interface HorizonMetric {
   mape: number;
   bias: number;
   medianError: number;
+}
+
+export interface StrictHorizonPerformance {
+  modelVersion?: string;
+  protocol: 'closest_pre_target_one_per_match';
+  horizonMetrics: HorizonMetric[];
 }
 
 export interface BusinessAccuracyKPIs {
