@@ -9,7 +9,8 @@ interface HorizonPerformanceChartProps {
 export const HorizonPerformanceChart: React.FC<HorizonPerformanceChartProps> = ({ metrics }) => {
   const [hoveredBucket, setHoveredBucket] = useState<HorizonMetric | null>(null);
 
-  const maxMape = Math.max(...metrics.map((m) => m.mape), 15);
+  const populatedMape = metrics.filter((m) => m.forecastsCount > 0).map((m) => m.mape);
+  const maxMape = Math.max(...populatedMape, 15);
   const chartHeight = 220;
   const chartWidth = 720;
   const padding = { top: 20, right: 30, bottom: 44, left: 50 };
@@ -18,7 +19,7 @@ export const HorizonPerformanceChart: React.FC<HorizonPerformanceChartProps> = (
   const plotHeight = chartHeight - padding.top - padding.bottom;
   const barWidth = 42;
 
-  const yTicks = [0, 5, 10, 15, Math.ceil(maxMape / 5) * 5];
+  const yTicks = Array.from(new Set([0, 5, 10, 15, Math.ceil(maxMape / 5) * 5])).sort((a, b) => a - b);
 
   const getY = (val: number) => {
     const topLimit = Math.max(15, Math.ceil(maxMape / 5) * 5);
@@ -35,11 +36,11 @@ export const HorizonPerformanceChart: React.FC<HorizonPerformanceChartProps> = (
           </div>
           <div className="flex items-center gap-1.5 text-zinc-500">
             <span className="w-2.5 h-0.5 bg-emerald-500" />
-            <span>Próg wysokiej wiarygodności (&lt; 5%)</span>
+            <span>Próg referencyjny 5%</span>
           </div>
         </div>
         <span className="text-[11px] text-zinc-400">
-          Im bliżej eventu, tym wyższa precyzja
+          Porównanie canonical horizons — bez założenia o kierunku poprawy
         </span>
       </div>
 
@@ -49,7 +50,6 @@ export const HorizonPerformanceChart: React.FC<HorizonPerformanceChartProps> = (
           className="w-full h-auto min-w-[500px]"
           onMouseLeave={() => setHoveredBucket(null)}
         >
-          {/* Y ticks & grid */}
           {yTicks.map((tick) => {
             const y = getY(tick);
             return (
@@ -75,7 +75,6 @@ export const HorizonPerformanceChart: React.FC<HorizonPerformanceChartProps> = (
             );
           })}
 
-          {/* 5% threshold guideline */}
           <line
             x1={padding.left}
             y1={getY(5)}
@@ -91,50 +90,62 @@ export const HorizonPerformanceChart: React.FC<HorizonPerformanceChartProps> = (
             textAnchor="end"
             className="fill-emerald-600 dark:fill-emerald-400 text-[9px] font-medium"
           >
-            Próg 5%
+            5%
           </text>
 
-          {/* Bars */}
           {metrics.map((m, idx) => {
             const step = plotWidth / metrics.length;
             const xCenter = padding.left + step * idx + step / 2;
             const x = xCenter - barWidth / 2;
-            const barHeight = Math.max(4, (m.mape / Math.max(15, Math.ceil(maxMape / 5) * 5)) * plotHeight);
+            const hasData = m.forecastsCount > 0;
+            const barHeight = hasData
+              ? Math.max(4, (m.mape / Math.max(15, Math.ceil(maxMape / 5) * 5)) * plotHeight)
+              : 0;
             const y = padding.top + plotHeight - barHeight;
             const isHovered = hoveredBucket?.horizon === m.horizon;
 
             return (
               <g
                 key={`bar-${m.horizon}`}
-                className="cursor-pointer transition-opacity"
-                onMouseEnter={() => setHoveredBucket(m)}
+                className={hasData ? 'cursor-pointer transition-opacity' : undefined}
+                onMouseEnter={() => hasData && setHoveredBucket(m)}
               >
-                <rect
-                  x={x}
-                  y={y}
-                  width={barWidth}
-                  height={barHeight}
-                  rx="3"
-                  className={`transition-colors ${
-                    isHovered
-                      ? 'fill-indigo-500'
-                      : m.mape <= 5
-                      ? 'fill-indigo-600'
-                      : 'fill-indigo-400'
-                  }`}
-                />
+                {hasData ? (
+                  <>
+                    <rect
+                      x={x}
+                      y={y}
+                      width={barWidth}
+                      height={barHeight}
+                      rx="3"
+                      className={`transition-colors ${
+                        isHovered
+                          ? 'fill-indigo-500'
+                          : m.mape <= 5
+                          ? 'fill-indigo-600'
+                          : 'fill-indigo-400'
+                      }`}
+                    />
+                    <text
+                      x={xCenter}
+                      y={y - 6}
+                      textAnchor="middle"
+                      className="fill-zinc-700 dark:fill-zinc-200 text-[11px] font-medium tabular-nums"
+                    >
+                      {formatPercent(m.mape)}
+                    </text>
+                  </>
+                ) : (
+                  <text
+                    x={xCenter}
+                    y={padding.top + plotHeight - 8}
+                    textAnchor="middle"
+                    className="fill-zinc-400 text-[11px]"
+                  >
+                    —
+                  </text>
+                )}
 
-                {/* Top value label */}
-                <text
-                  x={xCenter}
-                  y={y - 6}
-                  textAnchor="middle"
-                  className="fill-zinc-700 dark:fill-zinc-200 text-[11px] font-medium tabular-nums"
-                >
-                  {formatPercent(m.mape)}
-                </text>
-
-                {/* X axis bucket label */}
                 <text
                   x={xCenter}
                   y={chartHeight - padding.bottom + 16}
@@ -148,14 +159,13 @@ export const HorizonPerformanceChart: React.FC<HorizonPerformanceChartProps> = (
                   {m.horizon}
                 </text>
 
-                {/* Secondary label: Forecasts count */}
                 <text
                   x={xCenter}
                   y={chartHeight - padding.bottom + 30}
                   textAnchor="middle"
                   className="fill-zinc-400 text-[9px]"
                 >
-                  {m.forecastsCount} prognoz
+                  {m.forecastsCount} {m.forecastsCount === 1 ? 'mecz' : 'mecze'}
                 </text>
               </g>
             );
@@ -163,22 +173,21 @@ export const HorizonPerformanceChart: React.FC<HorizonPerformanceChartProps> = (
         </svg>
       </div>
 
-      {/* Floating tooltip */}
-      {hoveredBucket && (
+      {hoveredBucket && hoveredBucket.forecastsCount > 0 && (
         <div className="mt-2 flex items-center justify-between rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 text-xs text-zinc-600 dark:text-zinc-300">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-zinc-900 dark:text-zinc-100">
               Horyzont: {hoveredBucket.horizon}
             </span>
             <span>·</span>
-            <span>Liczba prognoz: {hoveredBucket.forecastsCount}</span>
+            <span>Mecze: {hoveredBucket.forecastsCount}</span>
           </div>
           <div className="flex items-center gap-4 tabular-nums">
             <span>
               MAPE: <strong className="text-indigo-600">{formatPercent(hoveredBucket.mape)}</strong>
             </span>
             <span>
-              MAE: <strong className="text-zinc-900 dark:text-zinc-100">{formatNumber(hoveredBucket.mae)} biletów</strong>
+              MAE: <strong className="text-zinc-900 dark:text-zinc-100">{formatNumber(hoveredBucket.mae)} osób</strong>
             </span>
             <span>
               Bias: <strong className={hoveredBucket.bias >= 0 ? 'text-zinc-700 dark:text-zinc-300' : 'text-amber-600'}>
