@@ -1,0 +1,6 @@
+{
+  "name": "Beyond Ticketing",
+  "description": "System monitorowania prognoz ML sprzedaży biletów na wydarzenia sportowe i analizy jakości modeli dla Beyond.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
