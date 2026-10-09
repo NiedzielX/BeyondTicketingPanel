@@ -17,6 +17,7 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [dataIssuesCount, setDataIssuesCount] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   // Club context for ticketing manager POC demo
   const [selectedClubContext, setSelectedClubContext] = useState<string>('Lech Poznań');
@@ -56,9 +57,14 @@ export default function App() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      const issues = await eventsService.getDataIssues();
+      await eventsService.refresh();
+      const [issues, clubs] = await Promise.all([
+        eventsService.getDataIssues(),
+        eventsService.getClubsList()
+      ]);
       setDataIssuesCount(issues.length);
-      await new Promise((r) => setTimeout(r, 450));
+      setClubsList(['Wszystkie kluby', ...clubs]);
+      setRefreshVersion((version) => version + 1);
     } finally {
       setIsRefreshing(false);
     }
@@ -66,7 +72,6 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-100 antialiased selection:bg-indigo-500 selection:text-white">
-      {/* Sidebar with KLUB and BEYOND OPERATIONS sections */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={handleSelectTab}
@@ -78,7 +83,6 @@ export default function App() {
         clubs={clubsList}
       />
 
-      {/* Main Content Area */}
       <div className="flex flex-1 flex-col min-w-0">
         <Header
           currentTab={currentTab}
@@ -89,7 +93,10 @@ export default function App() {
           isRefreshing={isRefreshing}
         />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto">
+        <main
+          key={refreshVersion}
+          className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto"
+        >
           {selectedEventId ? (
             <EventDetailPage eventId={selectedEventId} onBack={handleBackToEvents} />
           ) : (
