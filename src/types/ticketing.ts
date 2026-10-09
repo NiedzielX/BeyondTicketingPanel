@@ -1,4 +1,4 @@
-export type CompetitionType = 'Ekstraklasa' | 'Puchar Polski' | 'Liga Konferencji' | 'Mecz Towarzyski';
+export type CompetitionType = string;
 
 export type EventStatus = 'active' | 'completed' | 'cancelled';
 
@@ -27,33 +27,48 @@ export interface SportEvent {
   name: string;
   homeTeam: string;
   awayTeam: string;
-  club: string; // Klub gospodarz
+  club: string;
+  clubSlug?: string;
   competition: CompetitionType;
-  eventDate: string; // ISO string
+  eventDate: string;
   capacity: number;
   status: EventStatus;
+  provider?: string;
+  externalEventId?: string;
 }
 
 export interface Snapshot {
   id: string;
   eventId: string;
-  timestamp: string; // ISO string
+  timestamp: string;
+  /** Derived proxy: configured stadium capacity minus public inventory available. */
   sold: number;
+  /** Public ticket inventory visible in the source system at the snapshot time. */
+  available?: number;
+  sectorCount?: number;
+  interpretation?: 'demand_proxy_not_confirmed_sales';
 }
 
 export interface Forecast {
   id: string;
   eventId: string;
-  timestamp: string; // ISO string
+  timestamp: string;
   predictedFinalSales: number;
+  predictedLow?: number;
+  predictedHigh?: number;
   sourceSnapshotId: string;
   modelVersion?: string;
+  rawStatus?: string;
+  signalReadiness?: string;
+  liveAdjustment?: number;
 }
 
 export interface Outcome {
   eventId: string;
   actualFinalSales: number;
   recordedAt: string;
+  sourceName?: string;
+  attendanceDefinition?: string;
 }
 
 export interface DataIssue {
@@ -61,7 +76,7 @@ export interface DataIssue {
   eventId: string;
   type: IssueType;
   description: string;
-  detectedAt: string; // ISO string
+  detectedAt: string;
   severity: IssueSeverity;
 }
 
@@ -72,20 +87,24 @@ export interface EnrichedEvent extends SportEvent {
   outcome?: Outcome;
   dataStatus: DataStatus;
   forecastStatus: ForecastStatus;
+  /** Capacity - public inventory. This is a demand proxy, not confirmed ticket sales. */
   currentSold: number;
+  inventoryAvailable?: number;
+  inventoryInterpretation: 'demand_proxy_not_confirmed_sales';
   currentForecast?: number;
+  forecastLow?: number;
+  forecastHigh?: number;
   forecastDelta?: number;
   daysToEvent: number;
   lastUpdated: string;
-  utilizationRate?: number; // predicted / capacity * 100
-  currentUtilization: number; // currentSold / capacity * 100
-  remainingCapacity: number; // capacity - currentSold
-  forecastRemainingUnsold: number; // capacity - currentForecast
+  utilizationRate?: number;
+  currentUtilization: number;
+  remainingCapacity: number;
+  forecastRemainingUnsold: number;
   commercialStatus: ClubCommercialStatus;
   trend: SalesTrend;
   hasIssues: boolean;
   issuesCount: number;
-  // For completed events:
   finalAbsoluteError?: number;
   finalPercentageError?: number;
 }
@@ -156,8 +175,8 @@ export interface BusinessAccuracyKPIs {
   medianError: number;
   mape: number;
   bias: number;
-  accuracyWithin5Pct: number; // np. 78.5%
-  accuracyWithin10Pct: number; // np. 94.2%
+  accuracyWithin5Pct: number;
+  accuracyWithin10Pct: number;
   evaluatedMatchesCount: number;
   totalEvaluatedForecasts: number;
 }
