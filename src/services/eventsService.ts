@@ -1,25 +1,21 @@
 import {
   ClubCommercialStatus,
   ClubOverviewKPIs,
+  DataIssue,
   DataIssueEnriched,
   DataStatus,
   EnrichedEvent,
   EventDetailData,
+  Forecast,
   ForecastHistoryItem,
   ForecastStatus,
   HorizonMetric,
   ModelPerformanceData,
+  Outcome,
   SalesTrend,
+  Snapshot,
   SportEvent
 } from '../types/ticketing';
-import {
-  RAW_EVENTS,
-  RAW_SNAPSHOTS,
-  RAW_FORECASTS,
-  RAW_OUTCOMES,
-  RAW_DATA_ISSUES,
-  SIMULATED_NOW
-} from '../data/mockData';
 import {
   absoluteError,
   calculateBias,
@@ -32,6 +28,7 @@ import {
   percentageError,
   signedError
 } from '../utils/metrics';
+import { fetchRows } from './supabaseRest';
 
 export interface EventFilterOptions {
   search?: string;
@@ -44,22 +41,341 @@ export interface EventFilterOptions {
   sortOrder?: 'asc' | 'desc';
 }
 
+interface TicketEventRow {
+  id: number;
+  provider: string;
+  external_event_id: string;
+  home_team: string;
+  away_team: string;
+  competition: string | null;
+  match_date: string;
+  kickoff_at: string | null;
+  mapping_confidence: string | null;
+  club_slug: string | null;
+  source_domain: string | null;
+}
+
+interface SnapshotRow {
+  id: number;
+  ticket_event_id: number;
+  captured_at: string;
+  event_match_date_at_capture: string | null;
+  event_kickoff_at_capture: string | null;
+  available_total: number | null;
+  sector_count: number | null;
+}
+
+interface OutcomeRow {
+  ticket_event_id: number;
+  actual_attendance: number | null;
+  attendance_definition: string | null;
+  source_name: string | null;
+  confirmed_at: string | null;
+}
+
+interface ForecastObservationRow {
+  id: number;
+  ticket_event_id: number;
+  source_snapshot_id: number | null;
+  forecast_generated_at: string;
+  source_snapshot_captured_at: string | null;
+  hours_to_kickoff: number | null;
+  days_to_match: number | null;
+  horizon: string | null;
+  model_version: string | null;
+  historical_p10: number | null;
+  historical_p50: number | null;
+  historical_p90: number | null;
+  live_adjustment: number | null;
+  final_p10: number | null;
+  final_p50: number | null;
+  final_p90: number | null;
+  forecast_status: string | null;
+  correction_status: string | null;
+  signal_readiness: string | null;
+  live_available_total: number | null;
+  live_first_available_total: number | null;
+  live_available_index: number | null;
+  live_net_removed_since_first: number | null;
+  live_net_removed_since_previous: number | null;
+  live_velocity_since_previous: number | null;
+  live_net_removed_6h: number | null;
+  live_velocity_6h: number | null;
+  live_net_removed_24h: number | null;
+  live_velocity_24h: number | null;
+  live_acceleration_6h_vs_24h: number | null;
+  live_raw_snapshot_count: number | null;
+  live_clean_snapshot_count: number | null;
+  live_excluded_anomaly_count: number | null;
+}
+
+// POC configuration only. The ML database currently does not store stadium capacity.
+// These values are used to translate public inventory into an occupancy proxy for the UI.
+const CLUB_CAPACITY_BY_SLUG: Record<string, number> = {
+  lech: 42837,
+  jagiellonia: 22372,
+  pogonszczecin: 21163,
+  gornikzabrze: 24563,
+  cracovia: 15114
+};
+
+const DATA_TTL_MS = 60_000;
+
 export function isAllClubs(club?: string | null): boolean {
   if (!club) return true;
   const c = club.trim().toLowerCase();
   return c === 'wszystkie' || c === 'wszystkie kluby' || c === 'all' || c === '';
 }
 
-class EventsService {
-  private events: SportEvent[] = [...RAW_EVENTS];
-  private snapshots = [...RAW_SNAPSHOTS];
-  private forecasts = [...RAW_FORECASTS];
-  private outcomes = [...RAW_OUTCOMES];
-  private issues = [...RAW_DATA_ISSUES];
+function currentIso(): string {
+  return new Date().toISOString();
+}
 
-  /**
-   * Helper to enrich a single raw SportEvent with ticketing intelligence metrics
-   */
+function eventTimestamp(row: TicketEventRow): string {
+  return row.kickoff_at || `${row.match_date}T12:00:00Z`;
+}
+
+class EventsService {
+  private events: SportEvent[] = [];
+  private snapshots: Snapshot[] = [];
+  private forecasts: Forecast[] = [];
+  private outcomes: Outcome[] = [];
+  private issues: DataIssue[] = [];
+  private rawForecasts: ForecastObservationRow[] = [];
+  private loadedAt = 0;
+  private loadPromise: Promise<void> | null = null;
+
+  private async ensureLoaded(force = false): Promise<void> {
+    const fresh = Date.now() - this.loadedAt < DATA_TTL_MS;
+    if (!force && this.loadedAt > 0 && fresh) return;
+
+    if (!this.loadPromise) {
+      this.loadPromise = this.loadData().finally(() => {
+        this.loadPromise = null;
+      });
+    }
+
+    await this.loadPromise;
+  }
+
+  async refresh(): Promise<void> {
+    this.loadedAt = 0;
+    await this.ensureLoaded(true);
+  }
+
+  private capacityForEvent(
+    row: TicketEventRow,
+    forecastRows: ForecastObservationRow[],
+    outcome?: OutcomeRow,
+    snapshotRows: SnapshotRow[] = []
+  ): number {
+    if (row.club_slug && CLUB_CAPACITY_BY_SLUG[row.club_slug]) {
+      return CLUB_CAPACITY_BY_SLUG[row.club_slug];
+    }
+
+    const candidates = [
+      ...forecastRows.flatMap((f) => [f.final_p90, f.final_p50, f.historical_p90]),
+      outcome?.actual_attendance,
+      ...snapshotRows.map((s) => s.available_total)
+    ].filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+
+    return candidates.length > 0 ? Math.max(...candidates) : 1;
+  }
+
+  private async loadData(): Promise<void> {
+    const [eventRows, snapshotRows, outcomeRows, forecastRows] = await Promise.all([
+      fetchRows<TicketEventRow>('ticket_events', {
+        select:
+          'id,provider,external_event_id,home_team,away_team,competition,match_date,kickoff_at,mapping_confidence,club_slug,source_domain',
+        order: 'match_date.asc,id.asc'
+      }),
+      fetchRows<SnapshotRow>('snapshots', {
+        select:
+          'id,ticket_event_id,captured_at,event_match_date_at_capture,event_kickoff_at_capture,available_total,sector_count',
+        order: 'captured_at.asc,id.asc'
+      }),
+      fetchRows<OutcomeRow>('ticket_event_outcomes', {
+        select:
+          'ticket_event_id,actual_attendance,attendance_definition,source_name,confirmed_at',
+        order: 'ticket_event_id.asc'
+      }),
+      fetchRows<ForecastObservationRow>('forecast_observations', {
+        select:
+          'id,ticket_event_id,source_snapshot_id,forecast_generated_at,source_snapshot_captured_at,hours_to_kickoff,days_to_match,horizon,model_version,historical_p10,historical_p50,historical_p90,live_adjustment,final_p10,final_p50,final_p90,forecast_status,correction_status,signal_readiness,live_available_total,live_first_available_total,live_available_index,live_net_removed_since_first,live_net_removed_since_previous,live_velocity_since_previous,live_net_removed_6h,live_velocity_6h,live_net_removed_24h,live_velocity_24h,live_acceleration_6h_vs_24h,live_raw_snapshot_count,live_clean_snapshot_count,live_excluded_anomaly_count',
+        order: 'forecast_generated_at.asc,id.asc'
+      })
+    ]);
+
+    this.rawForecasts = forecastRows;
+
+    const outcomeByEvent = new Map<number, OutcomeRow>();
+    for (const row of outcomeRows) outcomeByEvent.set(row.ticket_event_id, row);
+
+    const snapshotsByEvent = new Map<number, SnapshotRow[]>();
+    for (const row of snapshotRows) {
+      const list = snapshotsByEvent.get(row.ticket_event_id) || [];
+      list.push(row);
+      snapshotsByEvent.set(row.ticket_event_id, list);
+    }
+
+    const forecastsByEvent = new Map<number, ForecastObservationRow[]>();
+    for (const row of forecastRows) {
+      const list = forecastsByEvent.get(row.ticket_event_id) || [];
+      list.push(row);
+      forecastsByEvent.set(row.ticket_event_id, list);
+    }
+
+    const capacityByEvent = new Map<number, number>();
+    for (const row of eventRows) {
+      capacityByEvent.set(
+        row.id,
+        this.capacityForEvent(
+          row,
+          forecastsByEvent.get(row.id) || [],
+          outcomeByEvent.get(row.id),
+          snapshotsByEvent.get(row.id) || []
+        )
+      );
+    }
+
+    const now = Date.now();
+
+    this.events = eventRows.map((row) => {
+      const date = eventTimestamp(row);
+      const status = new Date(date).getTime() < now ? 'completed' : 'active';
+
+      return {
+        id: String(row.id),
+        name: `${row.home_team} – ${row.away_team}`,
+        homeTeam: row.home_team,
+        awayTeam: row.away_team,
+        club: row.home_team,
+        clubSlug: row.club_slug || undefined,
+        competition: row.competition || 'Nieokreślone rozgrywki',
+        eventDate: date,
+        capacity: capacityByEvent.get(row.id) || 1,
+        status,
+        provider: row.provider,
+        externalEventId: row.external_event_id
+      } as SportEvent;
+    });
+
+    this.snapshots = snapshotRows
+      .filter((row) => row.available_total !== null)
+      .map((row) => {
+        const capacity = capacityByEvent.get(row.ticket_event_id) || 1;
+        const available = Math.max(0, row.available_total || 0);
+        const occupiedProxy = Math.max(0, capacity - available);
+
+        return {
+          id: String(row.id),
+          eventId: String(row.ticket_event_id),
+          timestamp: row.captured_at,
+          sold: occupiedProxy,
+          available,
+          sectorCount: row.sector_count ?? undefined,
+          interpretation: 'demand_proxy_not_confirmed_sales'
+        } satisfies Snapshot;
+      });
+
+    this.forecasts = forecastRows
+      .filter((row) => row.final_p50 !== null)
+      .map((row) => ({
+        id: String(row.id),
+        eventId: String(row.ticket_event_id),
+        timestamp: row.forecast_generated_at,
+        predictedFinalSales: row.final_p50 as number,
+        predictedLow: row.final_p10 ?? undefined,
+        predictedHigh: row.final_p90 ?? undefined,
+        sourceSnapshotId: row.source_snapshot_id !== null ? String(row.source_snapshot_id) : '',
+        modelVersion: row.model_version ?? undefined,
+        rawStatus: row.forecast_status ?? undefined,
+        signalReadiness: row.signal_readiness ?? undefined,
+        liveAdjustment: row.live_adjustment ?? undefined
+      }));
+
+    this.outcomes = outcomeRows
+      .filter((row) => row.actual_attendance !== null)
+      .map((row) => ({
+        eventId: String(row.ticket_event_id),
+        actualFinalSales: row.actual_attendance as number,
+        recordedAt: row.confirmed_at || '',
+        sourceName: row.source_name ?? undefined,
+        attendanceDefinition: row.attendance_definition ?? undefined
+      }));
+
+    this.issues = this.buildDerivedIssues();
+    this.loadedAt = Date.now();
+  }
+
+  private buildDerivedIssues(): DataIssue[] {
+    const result: DataIssue[] = [];
+    const now = Date.now();
+
+    for (const event of this.events) {
+      if (event.status !== 'active') continue;
+
+      const eventSnapshots = this.snapshots
+        .filter((s) => s.eventId === event.id)
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      const eventForecasts = this.forecasts
+        .filter((f) => f.eventId === event.id)
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+      const latestSnapshot = eventSnapshots[eventSnapshots.length - 1];
+      const latestForecast = eventForecasts[eventForecasts.length - 1];
+
+      if (!latestSnapshot) {
+        result.push({
+          id: `missing-snapshot-${event.id}`,
+          eventId: event.id,
+          type: 'stale_snapshot',
+          description: 'Brak publicznego snapshotu inventory dla tego meczu.',
+          detectedAt: currentIso(),
+          severity: 'critical'
+        });
+        continue;
+      }
+
+      const snapshotAgeHours = (now - new Date(latestSnapshot.timestamp).getTime()) / 3_600_000;
+      if (snapshotAgeHours > 18) {
+        result.push({
+          id: `stale-snapshot-${event.id}`,
+          eventId: event.id,
+          type: 'stale_snapshot',
+          description: `Ostatni snapshot inventory ma ${Math.floor(snapshotAgeHours)} h.`,
+          detectedAt: currentIso(),
+          severity: 'warning'
+        });
+      }
+
+      if (!latestForecast) {
+        result.push({
+          id: `missing-forecast-${event.id}`,
+          eventId: event.id,
+          type: 'missing_forecast',
+          description: 'Model nie opublikował jeszcze prognozy P50 dla tego meczu.',
+          detectedAt: currentIso(),
+          severity: 'warning'
+        });
+      } else if (
+        new Date(latestSnapshot.timestamp).getTime() >
+        new Date(latestForecast.timestamp).getTime() + 30 * 60 * 1000
+      ) {
+        result.push({
+          id: `forecast-older-${event.id}`,
+          eventId: event.id,
+          type: 'forecast_older_than_data',
+          description: 'Dostępny jest nowszy snapshot inventory niż ostatnia prognoza modelu.',
+          detectedAt: currentIso(),
+          severity: 'info'
+        });
+      }
+    }
+
+    return result;
+  }
+
   private enrichEvent(event: SportEvent): EnrichedEvent {
     const eventSnapshots = this.snapshots
       .filter((s) => s.eventId === event.id)
@@ -77,63 +393,44 @@ class EventsService {
     const outcome = this.outcomes.find((o) => o.eventId === event.id);
     const eventIssues = this.issues.filter((i) => i.eventId === event.id);
 
-    const remainingDays = daysToEvent(SIMULATED_NOW, event.eventDate);
+    const remainingDays = daysToEvent(currentIso(), event.eventDate);
     const currentSold = latestSnapshot ? latestSnapshot.sold : 0;
     const currentForecast = latestForecast?.predictedFinalSales;
 
     const delta = latestForecast
-      ? forecastDelta(
-          latestForecast.predictedFinalSales,
-          previousForecast?.predictedFinalSales
-        )
+      ? forecastDelta(latestForecast.predictedFinalSales, previousForecast?.predictedFinalSales)
       : null;
 
-    // Data status calculation
     let dataStatus: DataStatus = 'Aktualne';
     if (!latestSnapshot) {
       dataStatus = 'Brak danych';
-    } else if (eventIssues.some((i) => i.severity === 'critical' || i.type === 'unusual_sales_drop')) {
+    } else if (eventIssues.some((i) => i.severity === 'critical')) {
       dataStatus = 'Problem';
-    } else if (eventIssues.some((i) => i.type === 'stale_snapshot')) {
+    } else if (event.status === 'active' && eventIssues.some((i) => i.type === 'stale_snapshot')) {
       dataStatus = 'Nieaktualne';
-    } else {
-      const snapDiffHours =
-        (new Date(SIMULATED_NOW).getTime() - new Date(latestSnapshot.timestamp).getTime()) /
-        (1000 * 60 * 60);
-      if (snapDiffHours > 18) {
-        dataStatus = 'Nieaktualne';
-      }
     }
 
-    // Forecast status calculation
     let forecastStatus: ForecastStatus = 'Aktualna';
     if (!latestForecast) {
       forecastStatus = 'Brak prognozy';
-    } else if (eventIssues.some((i) => i.type === 'unusual_sales_drop')) {
-      forecastStatus = 'Problem';
-    } else if (
-      latestSnapshot &&
-      latestForecast &&
-      new Date(latestSnapshot.timestamp).getTime() > new Date(latestForecast.timestamp).getTime()
-    ) {
+    } else if (eventIssues.some((i) => i.type === 'forecast_older_than_data')) {
       forecastStatus = 'Do przeliczenia';
     }
 
-    // Capacity metrics
-    const currentUtilization = (currentSold / event.capacity) * 100;
-    const utilizationRate = currentForecast
-      ? (currentForecast / event.capacity) * 100
-      : undefined;
+    const currentUtilization = event.capacity > 0 ? (currentSold / event.capacity) * 100 : 0;
+    const utilizationRate =
+      currentForecast !== undefined && event.capacity > 0
+        ? (currentForecast / event.capacity) * 100
+        : undefined;
 
-    const remainingCapacity = Math.max(0, event.capacity - currentSold);
+    const remainingCapacity = latestSnapshot?.available ?? Math.max(0, event.capacity - currentSold);
     const forecastRemainingUnsold = Math.max(
       0,
       event.capacity - (currentForecast ?? currentSold)
     );
 
-    // Commercial status classification for club ticketing manager
     let commercialStatus: ClubCommercialStatus = 'Zgodnie z oczekiwaniami';
-    if (eventIssues.some((i) => i.severity === 'critical' || i.type === 'unusual_sales_drop')) {
+    if (eventIssues.some((i) => i.severity === 'critical')) {
       commercialStatus = 'Wymaga uwagi';
     } else if (forecastStatus === 'Brak prognozy' && remainingDays <= 20) {
       commercialStatus = 'Wymaga uwagi';
@@ -144,26 +441,15 @@ class EventsService {
         commercialStatus = 'Wymaga uwagi';
       } else if (utilizationRate < 60) {
         commercialStatus = 'Poniżej oczekiwań';
-      } else {
-        commercialStatus = 'Zgodnie z oczekiwaniami';
       }
     }
 
-    // Sales Trend calculation
     let trend: SalesTrend = 'Stabilny';
     if (delta !== null && delta !== undefined) {
-      if (delta >= 600) {
-        trend = 'Przyspiesza';
-      } else if (delta < 0) {
-        trend = 'Zwalnia';
-      } else {
-        trend = 'Stabilny';
-      }
-    } else if (currentUtilization > 70) {
-      trend = 'Przyspiesza';
+      if (delta >= 600) trend = 'Przyspiesza';
+      else if (delta < 0) trend = 'Zwalnia';
     }
 
-    // Completed events accuracy
     let finalAbsErr: number | undefined;
     let finalPctErr: number | undefined;
     if (outcome && latestForecast) {
@@ -172,7 +458,12 @@ class EventsService {
       finalPctErr = pct ?? undefined;
     }
 
-    const lastUpdated = latestForecast?.timestamp ?? latestSnapshot?.timestamp ?? event.eventDate;
+    const updateCandidates = [latestSnapshot?.timestamp, latestForecast?.timestamp].filter(
+      (v): v is string => Boolean(v)
+    );
+    const lastUpdated =
+      updateCandidates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ||
+      event.eventDate;
 
     return {
       ...event,
@@ -183,7 +474,11 @@ class EventsService {
       dataStatus,
       forecastStatus,
       currentSold,
+      inventoryAvailable: latestSnapshot?.available,
+      inventoryInterpretation: 'demand_proxy_not_confirmed_sales',
       currentForecast,
+      forecastLow: latestForecast?.predictedLow,
+      forecastHigh: latestForecast?.predictedHigh,
       forecastDelta: delta ?? undefined,
       daysToEvent: remainingDays,
       lastUpdated,
@@ -200,10 +495,8 @@ class EventsService {
     };
   }
 
-  /**
-   * Returns list of events with filtering, search, and sorting
-   */
   async getEvents(options: EventFilterOptions = {}): Promise<EnrichedEvent[]> {
+    await this.ensureLoaded();
     let result = this.events.map((e) => this.enrichEvent(e));
 
     if (options.status && options.status !== 'all') {
@@ -268,8 +561,6 @@ class EventsService {
         case 'name':
           comparison = a.name.localeCompare(b.name, 'pl');
           break;
-        default:
-          comparison = 0;
       }
       return sortAsc ? comparison : -comparison;
     });
@@ -277,10 +568,8 @@ class EventsService {
     return result;
   }
 
-  /**
-   * Returns a single event with full detail data, history, and model diagnostics
-   */
   async getEventById(id: string): Promise<EventDetailData | null> {
+    await this.ensureLoaded();
     const raw = this.events.find((e) => e.id === id);
     if (!raw) return null;
 
@@ -298,13 +587,24 @@ class EventsService {
 
     const lastSnapshot = snapshots[snapshots.length - 1];
     const lastForecast = forecasts[forecasts.length - 1];
+    const sourceSnapshot = lastForecast?.sourceSnapshotId
+      ? snapshots.find((s) => s.id === lastForecast.sourceSnapshotId)
+      : undefined;
 
     let pipelineStatus: 'ok' | 'degraded' | 'error' = 'ok';
-    if (issues.some((i) => i.severity === 'critical')) {
-      pipelineStatus = 'error';
-    } else if (issues.length > 0 || event.dataStatus !== 'Aktualne') {
-      pipelineStatus = 'degraded';
-    }
+    if (issues.some((i) => i.severity === 'critical')) pipelineStatus = 'error';
+    else if (issues.length > 0 || event.dataStatus !== 'Aktualne') pipelineStatus = 'degraded';
+
+    const pipelineLatencyMinutes =
+      lastForecast && sourceSnapshot
+        ? Math.max(
+            0,
+            Math.round(
+              (new Date(lastForecast.timestamp).getTime() - new Date(sourceSnapshot.timestamp).getTime()) /
+                60_000
+            )
+          )
+        : 0;
 
     return {
       event,
@@ -317,17 +617,15 @@ class EventsService {
         lastForecastAt: lastForecast?.timestamp,
         snapshotsCount: snapshots.length,
         forecastsCount: forecasts.length,
-        activeModel: 'Beyond Production Engine (v2.4)',
-        pipelineLatencyMinutes: 4,
+        activeModel: lastForecast?.modelVersion || 'Brak aktywnej prognozy',
+        pipelineLatencyMinutes,
         lastRefreshStatus: pipelineStatus
       }
     };
   }
 
-  /**
-   * Returns list of ForecastHistoryItem for detailed table in Event Detail
-   */
   async getForecastHistory(eventId: string): Promise<ForecastHistoryItem[]> {
+    await this.ensureLoaded();
     const raw = this.events.find((e) => e.id === eventId);
     if (!raw) return [];
 
@@ -335,7 +633,9 @@ class EventsService {
       .filter((f) => f.eventId === eventId)
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-    const snapshots = this.snapshots.filter((s) => s.eventId === eventId);
+    const snapshots = this.snapshots
+      .filter((s) => s.eventId === eventId)
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     const outcome = this.outcomes.find((o) => o.eventId === eventId);
 
     const historyItems: ForecastHistoryItem[] = [];
@@ -346,7 +646,7 @@ class EventsService {
 
       const matchedSnapshot =
         snapshots.find((s) => s.id === fc.sourceSnapshotId) ||
-        snapshots
+        [...snapshots]
           .filter((s) => new Date(s.timestamp).getTime() <= new Date(fc.timestamp).getTime())
           .pop();
 
@@ -382,10 +682,8 @@ class EventsService {
     return historyItems;
   }
 
-  /**
-   * Returns Club-focused KPIs for the revised "Przegląd sprzedaży" view
-   */
   async getClubOverviewKPIs(clubFilter?: string): Promise<ClubOverviewKPIs> {
+    await this.ensureLoaded();
     let all = this.events.map((e) => this.enrichEvent(e));
     if (!isAllClubs(clubFilter)) {
       all = all.filter((e) => e.club === clubFilter);
@@ -395,41 +693,36 @@ class EventsService {
       .filter((e) => e.status === 'active')
       .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
 
-    // Average current utilization across upcoming active matches
     const avgCurrentUtil =
       active.length > 0
         ? active.reduce((sum, e) => sum + e.currentUtilization, 0) / active.length
         : 0;
 
-    // Average predicted final utilization across matches with forecast
     const withFc = active.filter((e) => e.utilizationRate !== undefined);
     const avgPredUtil =
       withFc.length > 0
         ? withFc.reduce((sum, e) => sum + (e.utilizationRate ?? 0), 0) / withFc.length
         : 0;
 
-    // Events needing attention (commercial status 'Wymaga uwagi' or issues)
     const needingAttention = active.filter(
       (e) => e.commercialStatus === 'Wymaga uwagi' || e.commercialStatus === 'Poniżej oczekiwań'
     );
 
-    // Completed events accuracy score
-    const completed = this.events
-      .filter((e) => e.status === 'completed')
-      .map((e) => this.enrichEvent(e));
+    const completed = all.filter((e) => e.status === 'completed');
     const completedPairs: Array<{ prediction: number; actual: number }> = [];
     for (const comp of completed) {
-      if (comp.currentForecast && comp.outcome) {
+      if (comp.currentForecast !== undefined && comp.outcome) {
         completedPairs.push({
           prediction: comp.currentForecast,
           actual: comp.outcome.actualFinalSales
         });
       }
     }
-    const mape = calculateMAPE(completedPairs);
-    const modelAccuracyScore = Number((100 - (mape > 0 ? mape : 3.8)).toFixed(1));
 
-    // Closest match data for featured section
+    const mape = calculateMAPE(completedPairs);
+    const modelAccuracyScore =
+      completedPairs.length > 0 ? Number(Math.max(0, 100 - mape).toFixed(1)) : 0;
+
     let closestMatchData: ClubOverviewKPIs['closestMatch'] | undefined;
     if (active.length > 0) {
       const closest = active[0];
@@ -458,10 +751,8 @@ class EventsService {
     };
   }
 
-  /**
-   * Returns Model Performance & Business Accuracy KPIs
-   */
   async getModelPerformance(filter?: { club?: string; dateRange?: string }): Promise<ModelPerformanceData> {
+    await this.ensureLoaded();
     const completedEvents = this.events.filter((e) => e.status === 'completed');
     const filteredEvents = !isAllClubs(filter?.club)
       ? completedEvents.filter((e) => e.club === filter?.club)
@@ -475,26 +766,20 @@ class EventsService {
 
       const evForecasts = this.forecasts.filter((f) => f.eventId === ev.id);
       for (const fc of evForecasts) {
-        const days = daysToEvent(fc.timestamp, ev.eventDate);
         evaluatedPairs.push({
           prediction: fc.predictedFinalSales,
           actual: outcome.actualFinalSales,
-          daysToEvent: days
+          daysToEvent: daysToEvent(fc.timestamp, ev.eventDate)
         });
       }
     }
 
-    const overallPairs = evaluatedPairs.map((p) => ({
-      prediction: p.prediction,
-      actual: p.actual
-    }));
-
+    const overallPairs = evaluatedPairs.map((p) => ({ prediction: p.prediction, actual: p.actual }));
     const mae = calculateMAE(overallPairs);
     const medianError = calculateMedianError(overallPairs);
     const mape = calculateMAPE(overallPairs);
     const bias = calculateBias(overallPairs);
 
-    // Business KPIs: Prognozy w zakresie ±5% i ±10%
     const within5 = evaluatedPairs.filter((p) => {
       const pErr = percentageError(p.prediction, p.actual);
       return pErr !== null && pErr <= 5.0;
@@ -505,13 +790,10 @@ class EventsService {
       return pErr !== null && pErr <= 10.0;
     }).length;
 
-    const accuracyWithin5Pct = evaluatedPairs.length > 0
-      ? Number(((within5 / evaluatedPairs.length) * 100).toFixed(1))
-      : 82.5;
-
-    const accuracyWithin10Pct = evaluatedPairs.length > 0
-      ? Number(((within10 / evaluatedPairs.length) * 100).toFixed(1))
-      : 95.8;
+    const accuracyWithin5Pct =
+      evaluatedPairs.length > 0 ? Number(((within5 / evaluatedPairs.length) * 100).toFixed(1)) : 0;
+    const accuracyWithin10Pct =
+      evaluatedPairs.length > 0 ? Number(((within10 / evaluatedPairs.length) * 100).toFixed(1)) : 0;
 
     const bucketNames: Array<'30+ dni' | '15–29 dni' | '8–14 dni' | '4–7 dni' | '1–3 dni' | 'dzień eventu'> = [
       '30+ dni',
@@ -523,14 +805,8 @@ class EventsService {
     ];
 
     const horizonMetrics: HorizonMetric[] = bucketNames.map((bucket) => {
-      const pairsInBucket = evaluatedPairs.filter(
-        (p) => getHorizonBucket(p.daysToEvent) === bucket
-      );
-
-      const purePairs = pairsInBucket.map((p) => ({
-        prediction: p.prediction,
-        actual: p.actual
-      }));
+      const pairsInBucket = evaluatedPairs.filter((p) => getHorizonBucket(p.daysToEvent) === bucket);
+      const purePairs = pairsInBucket.map((p) => ({ prediction: p.prediction, actual: p.actual }));
 
       return {
         horizon: bucket,
@@ -543,12 +819,12 @@ class EventsService {
     });
 
     const trendByTime = [
-      { daysBefore: 30, label: '30+ dni', mape: horizonMetrics[0]?.mape || 14.8, mae: horizonMetrics[0]?.mae || 3650 },
-      { daysBefore: 20, label: '15–29 dni', mape: horizonMetrics[1]?.mape || 8.6, mae: horizonMetrics[1]?.mae || 2120 },
-      { daysBefore: 10, label: '8–14 dni', mape: horizonMetrics[2]?.mape || 5.2, mae: horizonMetrics[2]?.mae || 1280 },
-      { daysBefore: 5, label: '4–7 dni', mape: horizonMetrics[3]?.mape || 3.1, mae: horizonMetrics[3]?.mae || 740 },
-      { daysBefore: 2, label: '1–3 dni', mape: horizonMetrics[4]?.mape || 1.8, mae: horizonMetrics[4]?.mae || 410 },
-      { daysBefore: 0, label: 'Dzień meczu', mape: horizonMetrics[5]?.mape || 1.1, mae: horizonMetrics[5]?.mae || 260 }
+      { daysBefore: 30, label: '30+ dni', mape: horizonMetrics[0]?.mape || 0, mae: horizonMetrics[0]?.mae || 0 },
+      { daysBefore: 20, label: '15–29 dni', mape: horizonMetrics[1]?.mape || 0, mae: horizonMetrics[1]?.mae || 0 },
+      { daysBefore: 10, label: '8–14 dni', mape: horizonMetrics[2]?.mape || 0, mae: horizonMetrics[2]?.mae || 0 },
+      { daysBefore: 5, label: '4–7 dni', mape: horizonMetrics[3]?.mape || 0, mae: horizonMetrics[3]?.mae || 0 },
+      { daysBefore: 2, label: '1–3 dni', mape: horizonMetrics[4]?.mape || 0, mae: horizonMetrics[4]?.mae || 0 },
+      { daysBefore: 0, label: 'Dzień meczu', mape: horizonMetrics[5]?.mape || 0, mae: horizonMetrics[5]?.mae || 0 }
     ];
 
     return {
@@ -559,7 +835,9 @@ class EventsService {
         bias,
         accuracyWithin5Pct,
         accuracyWithin10Pct,
-        evaluatedMatchesCount: filteredEvents.length,
+        evaluatedMatchesCount: filteredEvents.filter((ev) =>
+          this.outcomes.some((o) => o.eventId === ev.id) && this.forecasts.some((f) => f.eventId === ev.id)
+        ).length,
         totalEvaluatedForecasts: evaluatedPairs.length
       },
       horizonMetrics,
@@ -567,10 +845,8 @@ class EventsService {
     };
   }
 
-  /**
-   * Returns list of data issues enriched with event details
-   */
   async getDataIssues(filter?: { severity?: string }): Promise<DataIssueEnriched[]> {
+    await this.ensureLoaded();
     let result = this.issues.map((issue) => {
       const event = this.events.find((e) => e.id === issue.eventId);
       const enriched = event ? this.enrichEvent(event) : undefined;
@@ -590,10 +866,8 @@ class EventsService {
     return result;
   }
 
-  /**
-   * Returns unique list of clubs for filter dropdowns
-   */
   async getClubsList(): Promise<string[]> {
+    await this.ensureLoaded();
     const clubsSet = new Set(this.events.map((e) => e.club));
     return Array.from(clubsSet).sort((a, b) => a.localeCompare(b, 'pl'));
   }
