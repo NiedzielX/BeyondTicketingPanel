@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HelpCircle, Info, Filter, CheckCircle2, TrendingDown, Target, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 import { ModelPerformanceData } from '../types/ticketing';
 import { eventsService, isAllClubs } from '../services/eventsService';
 import { MetricCard } from '../components/common/MetricCard';
@@ -18,7 +18,6 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
   const [perfData, setPerfData] = useState<ModelPerformanceData | null>(null);
   const [clubs, setClubs] = useState<string[]>([]);
   const [selectedClub, setSelectedClub] = useState(selectedClubFilter || 'Wszystkie kluby');
-  const [selectedDateRange, setSelectedDateRange] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -33,10 +32,7 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
       try {
         const activeClub = isAllClubs(selectedClub) ? undefined : selectedClub;
         const [perf, clubsList] = await Promise.all([
-          eventsService.getModelPerformance({
-            club: activeClub,
-            dateRange: selectedDateRange
-          }),
+          eventsService.getModelPerformance({ club: activeClub }),
           eventsService.getClubsList()
         ]);
         setPerfData(perf);
@@ -47,7 +43,7 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
     };
 
     loadPerformance();
-  }, [selectedClub, selectedDateRange]);
+  }, [selectedClub]);
 
   if (isLoading || !perfData) {
     return (
@@ -59,145 +55,169 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
   }
 
   const { businessKpis, horizonMetrics } = perfData;
+  const sampleTooSmall = businessKpis.evaluatedMatchesCount < 10;
+  const within10Strong = businessKpis.accuracyWithin10Pct >= 80;
+  const within10Moderate = businessKpis.accuracyWithin10Pct >= 50;
+  const populatedHorizons = horizonMetrics.filter((row) => row.forecastsCount > 0).length;
+
+  const accuracyHighlight = (value: number): 'normal' | 'warning' | 'danger' | 'success' => {
+    if (sampleTooSmall) return 'warning';
+    if (value >= 80) return 'success';
+    if (value >= 50) return 'warning';
+    return 'danger';
+  };
+
+  const reliabilityPanel = sampleTooSmall
+    ? {
+        className:
+          'border-amber-200 dark:border-amber-900/60 bg-amber-50/60 dark:bg-amber-950/20 text-amber-950 dark:text-amber-200',
+        icon: <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />,
+        title: 'Wynik wstępny — zbyt mała próba do decyzji operacyjnych',
+        body: (
+          <>
+            Ocena opiera się obecnie na <strong>{businessKpis.evaluatedMatchesCount} zakończonych meczach</strong> i{' '}
+            <strong>{businessKpis.totalEvaluatedForecasts} punktach predykcji</strong>. W tej próbie{' '}
+            <strong>{formatPercent(businessKpis.accuracyWithin10Pct)}</strong> prognoz mieści się w przedziale ±10%.
+            To za mało, aby deklarować produkcyjną wiarygodność lub bezpieczeństwo planowania ochrony,
+            cateringu czy personelu. Wynik traktujemy diagnostycznie do czasu zebrania większej liczby outcome'ów.
+          </>
+        )
+      }
+    : within10Strong
+    ? {
+        className:
+          'border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-200',
+        icon: <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />,
+        title: 'Stabilna trafność w bieżącej próbie',
+        body: (
+          <>
+            <strong>{formatPercent(businessKpis.accuracyWithin10Pct)}</strong> zweryfikowanych prognoz mieści się
+            w przedziale ±10%. Wskaźnik można wykorzystywać jako jeden z sygnałów wspierających planowanie,
+            razem z wielkością próby, biasem i dokładnością dla konkretnego horyzontu czasowego.
+          </>
+        )
+      }
+    : {
+        className:
+          'border-rose-200 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/20 text-rose-950 dark:text-rose-200',
+        icon: <AlertTriangle className="w-4 h-4 text-rose-600 mt-0.5 shrink-0" />,
+        title: 'Model wymaga dalszej walidacji przed użyciem operacyjnym',
+        body: (
+          <>
+            Tylko <strong>{formatPercent(businessKpis.accuracyWithin10Pct)}</strong> zweryfikowanych prognoz mieści
+            się w przedziale ±10%. Nie traktujemy tego poziomu jako podstawy do samodzielnych decyzji
+            operacyjnych. Priorytetem jest dalszy backtesting i walidacja nowszych wersji modelu.
+          </>
+        )
+      };
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
             Trafność prognoz Beyond
           </h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Weryfikacja precyzji predykcji ticketingowych względem faktycznej liczby kibiców na meczach
+            Weryfikacja predykcji względem rzeczywistej frekwencji — bez marketingowych fallbacków
           </p>
         </div>
 
-        {/* Filtry po klubie i zakresie dat */}
-        <div className="flex items-center gap-2">
-          <select
-            value={isAllClubs(selectedClub) ? 'Wszystkie kluby' : selectedClub}
-            onChange={(e) => {
-              setSelectedClub(e.target.value);
-              onClubFilterChange?.(e.target.value);
-            }}
-            className="py-1.5 px-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer font-medium"
-          >
-            <option value="Wszystkie kluby">Wszystkie kluby</option>
-            {clubs.filter((c) => !isAllClubs(c)).map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedDateRange}
-            onChange={(e) => setSelectedDateRange(e.target.value)}
-            className="py-1.5 px-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
-          >
-            <option value="all">Cały sezon 2025/2026</option>
-            <option value="last90">Ostatnie 90 dni</option>
-            <option value="last30">Ostatnie 30 dni</option>
-          </select>
-        </div>
+        <select
+          value={isAllClubs(selectedClub) ? 'Wszystkie kluby' : selectedClub}
+          onChange={(e) => {
+            setSelectedClub(e.target.value);
+            onClubFilterChange?.(e.target.value);
+          }}
+          className="py-1.5 px-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer font-medium"
+        >
+          <option value="Wszystkie kluby">Wszystkie kluby</option>
+          {clubs.filter((c) => !isAllClubs(c)).map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* 6. Główne KPI w języku biznesowym */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {/* 1. Średni błąd prognozy */}
         <MetricCard
           label="Średni błąd prognozy"
           value={formatPercent(businessKpis.mape)}
-          subtext={`Około ${formatNumber(businessKpis.mae)} biletów`}
-          tooltip="Średni procentowy błąd względny (MAPE) wyliczony ze wszystkich zweryfikowanych meczów rozegranych w sezonie."
-          highlight="normal"
+          subtext={`MAE: około ${formatNumber(businessKpis.mae)} osób`}
+          tooltip="MAPE i MAE wyliczone wyłącznie z prognoz, dla których istnieje rzeczywisty outcome."
+          highlight={sampleTooSmall ? 'warning' : 'normal'}
         />
 
-        {/* 2. Mediana błędu */}
         <MetricCard
           label="Mediana błędu"
-          value={`${formatNumber(businessKpis.medianError)} szt.`}
-          subtext="Dla 50% meczów błąd jest mniejszy"
-          tooltip="Mediana odchylenia – typowy błąd w liczbie biletów, wolny od wpływu nietypowych anomalii pogodowych."
+          value={`${formatNumber(businessKpis.medianError)} osób`}
+          subtext="Typowy błąd bez dominacji skrajnych obserwacji"
+          tooltip="Mediana bezwzględnego błędu prognozy dla zweryfikowanych punktów predykcji."
         />
 
-        {/* 3. Prognozy w zakresie ±5% */}
         <MetricCard
           label="Prognozy w zakresie ±5%"
           value={formatPercent(businessKpis.accuracyWithin5Pct)}
-          subtext="Wysoka dokładność"
-          tooltip="Odsetek prognoz, które pomyliły się o mniej niż 5% ostatecznej frekwencji na stadionie."
-          highlight="success"
+          subtext={sampleTooSmall ? 'Wynik wstępny' : 'Ścisły próg trafności'}
+          tooltip="Odsetek zweryfikowanych prognoz, których bezwzględny błąd procentowy nie przekroczył 5%."
+          highlight={accuracyHighlight(businessKpis.accuracyWithin5Pct)}
         />
 
-        {/* 4. Prognozy w zakresie ±10% */}
         <MetricCard
           label="Prognozy w zakresie ±10%"
           value={formatPercent(businessKpis.accuracyWithin10Pct)}
-          subtext="Próg bezpieczeństwa operacyjnego"
-          tooltip="Niemal wszystkie prognozy Beyond mieszczą się w tym bezpiecznym korytarzu planowania służb i cateringu."
-          highlight="success"
+          subtext={sampleTooSmall ? 'Za mała próba do wniosku' : within10Strong ? 'Stabilny wynik' : within10Moderate ? 'Wymaga poprawy' : 'Poniżej celu'}
+          tooltip="Odsetek zweryfikowanych prognoz, których bezwzględny błąd procentowy nie przekroczył 10%."
+          highlight={accuracyHighlight(businessKpis.accuracyWithin10Pct)}
         />
 
-        {/* 5. Liczba ocenionych meczów */}
         <MetricCard
           label="Ocenione mecze"
           value={businessKpis.evaluatedMatchesCount}
           subtext={`${businessKpis.totalEvaluatedForecasts} punktów predykcji`}
-          tooltip="Liczba zakończonych spotkań Ekstraklasy, na których zweryfikowano końcowy wynik biletowy."
+          tooltip="Liczba zakończonych spotkań z outcome'em i co najmniej jedną prognozą."
+          highlight={sampleTooSmall ? 'warning' : 'normal'}
         />
       </div>
 
-      {/* Kicker dla dyrektora ticketingu */}
-      <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 p-4 text-xs text-emerald-950 dark:text-emerald-200">
+      <div className={`rounded-lg border p-4 text-xs ${reliabilityPanel.className}`}>
         <div className="flex items-start gap-2.5">
-          <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+          {reliabilityPanel.icon}
           <div className="space-y-1">
-            <h4 className="font-semibold text-emerald-900 dark:text-emerald-100">
-              Wiarygodność biznesowa dla klubu
-            </h4>
-            <p className="leading-relaxed opacity-90">
-              Aż <strong>{formatPercent(businessKpis.accuracyWithin10Pct)}</strong> prognoz Beyond mieści się w
-              bezpiecznym przedziale <strong>±10%</strong> od końcowego wyniku. Oznacza to, że klub może pewnie
-              planować zamawianie ochrony, personelu kas, cateringu oraz akcje marketingowe 'last-minute' bez
-              obaw o przestrzelenie założeń.
-            </p>
+            <h4 className="font-semibold">{reliabilityPanel.title}</h4>
+            <p className="leading-relaxed opacity-90">{reliabilityPanel.body}</p>
           </div>
         </div>
       </div>
 
-      {/* Wykres: Średni błąd względem czasu do eventu */}
       <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
           <div>
             <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-              Jak szybko prognoza staje się wiarygodna?
+              Jak zmienia się błąd wraz z czasem do meczu?
             </h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Średni błąd prognozy w kolejnych fazach sprzedaży biletów
+              Wyniki tylko dla horyzontów, w których mamy zweryfikowane punkty predykcji
             </p>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded">
-            <TrendingDown className="w-3.5 h-3.5" />
-            <span>Na 14 dni przed meczem błąd spada poniżej 5%</span>
+          <div className="flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1 rounded">
+            <Info className="w-3.5 h-3.5" />
+            <span>{businessKpis.totalEvaluatedForecasts} prognoz · {populatedHorizons} horyzontów z danymi</span>
           </div>
         </div>
 
         <HorizonPerformanceChart metrics={horizonMetrics} />
       </div>
 
-      {/* Tabela horyzontów z perspektywą decyzyjną */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              Tabela dokładności według horyzontu czasowego
-            </h2>
-            <p className="text-xs text-zinc-500">
-              Praktyczna rekomendacja decyzyjna dla każdego etapu kampanii biletowej
-            </p>
-          </div>
+        <div>
+          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            Dokładność według horyzontu czasowego
+          </h2>
+          <p className="text-xs text-zinc-500">
+            Potencjalne zastosowania biznesowe są hipotezami do walidacji — nie gwarancją operacyjną
+          </p>
         </div>
 
         <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
@@ -206,53 +226,35 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
               <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/75 dark:bg-zinc-900/50 text-zinc-500 font-medium">
                 <th className="py-3 px-4">Horyzont czasowy</th>
                 <th className="py-3 px-3 text-right">Liczba prognoz</th>
-                <th className="py-3 px-3 text-right">Średni błąd (bilety)</th>
-                <th className="py-3 px-3 text-right">Średni błąd %</th>
-                <th className="py-3 px-3 text-right">Kierunek (Bias)</th>
-                <th className="py-3 px-4">Zastosowanie decyzyjne w klubie</th>
+                <th className="py-3 px-3 text-right">MAE</th>
+                <th className="py-3 px-3 text-right">MAPE</th>
+                <th className="py-3 px-3 text-right">Bias</th>
+                <th className="py-3 px-4">Potencjalne zastosowanie po walidacji</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
               {horizonMetrics.map((row) => {
-                let recommendation = 'Wczesna kalibracja popytu i planowanie cen biletów';
-                if (row.horizon === '15–29 dni') recommendation = 'Decyzja o uruchomieniu kampanii reklamowej / social media';
-                if (row.horizon === '8–14 dni') recommendation = 'Ostateczny target ochrony, służb medycznych i cateringu';
-                if (row.horizon === '4–7 dni') recommendation = 'Dynamiczne promocje sektorowe / aktywacja bazy karnetowiczów';
-                if (row.horizon === '1–3 dni') recommendation = 'Zarządzanie wejściami, optymalizacja przepustowości bramek';
-                if (row.horizon === 'dzień eventu') recommendation = 'Końcowe rozliczenie i raport frekwencji';
+                let recommendation = 'Wczesna kalibracja popytu i planowanie kampanii';
+                if (row.horizon === '15–29 dni') recommendation = 'Planowanie kampanii reklamowej / social media';
+                if (row.horizon === '8–14 dni') recommendation = 'Planowanie ochrony, służb medycznych i cateringu';
+                if (row.horizon === '4–7 dni') recommendation = 'Promocje sektorowe i aktywacja bazy kibiców';
+                if (row.horizon === '1–3 dni') recommendation = 'Planowanie wejść i przepustowości bramek';
+                if (row.horizon === 'dzień eventu') recommendation = 'Końcowa estymacja frekwencji';
 
                 return (
                   <tr key={row.horizon} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40 transition-colors">
-                    <td className="py-3.5 px-4 font-semibold text-zinc-900 dark:text-zinc-100">
-                      {row.horizon}
-                    </td>
-                    <td className="py-3.5 px-3 text-right tabular-nums text-zinc-600 dark:text-zinc-400">
-                      {row.forecastsCount}
-                    </td>
+                    <td className="py-3.5 px-4 font-semibold text-zinc-900 dark:text-zinc-100">{row.horizon}</td>
+                    <td className="py-3.5 px-3 text-right tabular-nums text-zinc-600 dark:text-zinc-400">{row.forecastsCount}</td>
                     <td className="py-3.5 px-3 text-right tabular-nums font-medium text-zinc-900 dark:text-zinc-100">
-                      ±{formatNumber(row.mae)} biletów
+                      {row.forecastsCount > 0 ? `±${formatNumber(row.mae)}` : '—'}
                     </td>
                     <td className="py-3.5 px-3 text-right tabular-nums font-bold">
-                      <span
-                        className={
-                          row.mape <= 3
-                            ? 'text-emerald-600'
-                            : row.mape <= 5
-                            ? 'text-emerald-600'
-                            : row.mape <= 10
-                            ? 'text-indigo-600'
-                            : 'text-zinc-600 dark:text-zinc-400'
-                        }
-                      >
-                        {formatPercent(row.mape)}
-                      </span>
+                      {row.forecastsCount > 0 ? formatPercent(row.mape) : '—'}
                     </td>
                     <td className="py-3.5 px-3 text-right tabular-nums font-medium text-zinc-600">
-                      {row.bias > 0 ? `+${formatNumber(row.bias)}` : formatNumber(row.bias)}
+                      {row.forecastsCount > 0 ? (row.bias > 0 ? `+${formatNumber(row.bias)}` : formatNumber(row.bias)) : '—'}
                     </td>
-                    <td className="py-3.5 px-4 text-zinc-600 dark:text-zinc-300">
-                      {recommendation}
-                    </td>
+                    <td className="py-3.5 px-4 text-zinc-600 dark:text-zinc-300">{recommendation}</td>
                   </tr>
                 );
               })}
