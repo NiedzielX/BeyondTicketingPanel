@@ -183,9 +183,25 @@ export interface BusinessAccuracyKPIs {
   headlineMethod?: 'latest_forecast_per_match';
 }
 
+export interface ModelVersionMetric {
+  modelVersion: string;
+  forecastEventsCount: number;
+  evaluatedMatchesCount: number;
+  evaluatedForecastsCount: number;
+  mae?: number;
+  mape?: number;
+  wape?: number;
+  bias?: number;
+  accuracyWithin5Pct?: number;
+  accuracyWithin10Pct?: number;
+  intervalCoveragePct?: number;
+  status: 'evaluated' | 'awaiting_outcomes';
+}
+
 export interface ModelPerformanceData {
   businessKpis: BusinessAccuracyKPIs;
   horizonMetrics: HorizonMetric[];
+  modelVersionMetrics?: ModelVersionMetric[];
   trendByTime: Array<{
     daysBefore: number;
     label: string;
