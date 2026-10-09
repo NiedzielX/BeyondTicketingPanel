@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle2, Info } from 'lucide-react';
-import { ModelPerformanceData } from '../types/ticketing';
+import { EnrichedEvent, ModelPerformanceData } from '../types/ticketing';
 import { eventsService, isAllClubs } from '../services/eventsService';
 import { MetricCard } from '../components/common/MetricCard';
 import { HorizonPerformanceChart } from '../components/charts/HorizonPerformanceChart';
@@ -16,6 +16,7 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
   onClubFilterChange
 }) => {
   const [perfData, setPerfData] = useState<ModelPerformanceData | null>(null);
+  const [completedEvents, setCompletedEvents] = useState<EnrichedEvent[]>([]);
   const [clubs, setClubs] = useState<string[]>([]);
   const [selectedClub, setSelectedClub] = useState(selectedClubFilter || 'Wszystkie kluby');
   const [isLoading, setIsLoading] = useState(true);
@@ -31,12 +32,14 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
       setIsLoading(true);
       try {
         const activeClub = isAllClubs(selectedClub) ? undefined : selectedClub;
-        const [perf, clubsList] = await Promise.all([
+        const [perf, clubsList, completed] = await Promise.all([
           eventsService.getModelPerformance({ club: activeClub }),
-          eventsService.getClubsList()
+          eventsService.getClubsList(),
+          eventsService.getEvents({ status: 'completed', club: activeClub })
         ]);
         setPerfData(perf);
         setClubs(clubsList);
+        setCompletedEvents(completed);
       } finally {
         setIsLoading(false);
       }
@@ -55,10 +58,66 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
   }
 
   const { businessKpis, horizonMetrics } = perfData;
-  const sampleTooSmall = businessKpis.evaluatedMatchesCount < 10;
-  const within10Strong = businessKpis.accuracyWithin10Pct >= 80;
-  const within10Moderate = businessKpis.accuracyWithin10Pct >= 50;
+
+  // Headline accuracy is one observation per completed match: the latest P50 forecast
+  // available for that match. This prevents matches with more stored forecasts from
+  // receiving a larger weight in the executive KPI.
+  const evaluableEvents = completedEvents.filter(
+    (event) => event.outcome && event.currentForecast !== undefined
+  );
+
+  const headlineErrors = evaluableEvents.map((event) => {
+    const actual = event.outcome!.actualFinalSales;
+    const prediction = event.currentForecast!;
+    const signed = prediction - actual;
+    const absolute = Math.abs(signed);
+    const percentage = actual > 0 ? (absolute / actual) * 100 : 0;
+    return { signed, absolute, percentage };
+  });
+
+  const average = (values: number[]) =>
+    values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+
+  const median = (values: number[]) => {
+    if (values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+      ? (sorted[middle - 1] + sorted[middle]) / 2
+      : sorted[middle];
+  };
+
+  const headlineKpis = {
+    mae: average(headlineErrors.map((error) => error.absolute)),
+    medianError: median(headlineErrors.map((error) => error.absolute)),
+    mape: average(headlineErrors.map((error) => error.percentage)),
+    bias: average(headlineErrors.map((error) => error.signed)),
+    accuracyWithin5Pct:
+      headlineErrors.length > 0
+        ? (headlineErrors.filter((error) => error.percentage <= 5).length / headlineErrors.length) * 100
+        : 0,
+    accuracyWithin10Pct:
+      headlineErrors.length > 0
+        ? (headlineErrors.filter((error) => error.percentage <= 10).length / headlineErrors.length) * 100
+        : 0,
+    evaluatedMatchesCount: evaluableEvents.length,
+    modelVersions: Array.from(
+      new Set(
+        evaluableEvents
+          .map((event) => event.latestForecast?.modelVersion)
+          .filter((version): version is string => Boolean(version))
+      )
+    ).sort()
+  };
+
+  const sampleTooSmall = headlineKpis.evaluatedMatchesCount < 10;
+  const within10Strong = headlineKpis.accuracyWithin10Pct >= 80;
+  const within10Moderate = headlineKpis.accuracyWithin10Pct >= 50;
   const populatedHorizons = horizonMetrics.filter((row) => row.forecastsCount > 0).length;
+  const modelVersionLabel =
+    headlineKpis.modelVersions.length > 0
+      ? headlineKpis.modelVersions.join(', ')
+      : 'brak wersji do oceny';
 
   const accuracyHighlight = (value: number): 'normal' | 'warning' | 'danger' | 'success' => {
     if (sampleTooSmall) return 'warning';
@@ -75,11 +134,12 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
         title: 'Wynik wstępny — zbyt mała próba do decyzji operacyjnych',
         body: (
           <>
-            Ocena opiera się obecnie na <strong>{businessKpis.evaluatedMatchesCount} zakończonych meczach</strong> i{' '}
-            <strong>{businessKpis.totalEvaluatedForecasts} punktach predykcji</strong>. W tej próbie{' '}
-            <strong>{formatPercent(businessKpis.accuracyWithin10Pct)}</strong> prognoz mieści się w przedziale ±10%.
+            Headline jest liczony z <strong>ostatniej prognozy P50 dla każdego zakończonego meczu</strong>.
+            Obecnie mamy tylko <strong>{headlineKpis.evaluatedMatchesCount} takie mecze</strong>; ewaluowalna wersja to{' '}
+            <strong>{modelVersionLabel}</strong>. W tej próbie{' '}
+            <strong>{formatPercent(headlineKpis.accuracyWithin10Pct)}</strong> prognoz mieści się w przedziale ±10%.
             To za mało, aby deklarować produkcyjną wiarygodność lub bezpieczeństwo planowania ochrony,
-            cateringu czy personelu. Wynik traktujemy diagnostycznie do czasu zebrania większej liczby outcome'ów.
+            cateringu czy personelu. Nowsze wersje bez zakończonych meczów nie są jeszcze oceniane tym KPI.
           </>
         )
       }
@@ -91,9 +151,9 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
         title: 'Stabilna trafność w bieżącej próbie',
         body: (
           <>
-            <strong>{formatPercent(businessKpis.accuracyWithin10Pct)}</strong> zweryfikowanych prognoz mieści się
-            w przedziale ±10%. Wskaźnik można wykorzystywać jako jeden z sygnałów wspierających planowanie,
-            razem z wielkością próby, biasem i dokładnością dla konkretnego horyzontu czasowego.
+            <strong>{formatPercent(headlineKpis.accuracyWithin10Pct)}</strong> ostatnich prognoz per mecz mieści się
+            w przedziale ±10%. Wynik dotyczy: <strong>{modelVersionLabel}</strong>. Nadal należy czytać go razem
+            z wielkością próby, biasem i dokładnością dla konkretnego horyzontu czasowego.
           </>
         )
       }
@@ -104,9 +164,9 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
         title: 'Model wymaga dalszej walidacji przed użyciem operacyjnym',
         body: (
           <>
-            Tylko <strong>{formatPercent(businessKpis.accuracyWithin10Pct)}</strong> zweryfikowanych prognoz mieści
-            się w przedziale ±10%. Nie traktujemy tego poziomu jako podstawy do samodzielnych decyzji
-            operacyjnych. Priorytetem jest dalszy backtesting i walidacja nowszych wersji modelu.
+            Tylko <strong>{formatPercent(headlineKpis.accuracyWithin10Pct)}</strong> ostatnich prognoz per mecz mieści
+            się w przedziale ±10%. Wynik dotyczy: <strong>{modelVersionLabel}</strong>. Nie traktujemy tego poziomu
+            jako podstawy do samodzielnych decyzji operacyjnych.
           </>
         )
       };
@@ -119,7 +179,7 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
             Trafność prognoz Beyond
           </h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Weryfikacja predykcji względem rzeczywistej frekwencji — bez marketingowych fallbacków
+            Headline: ostatnia prognoza per mecz · horyzonty: pełna historia punktów predykcji
           </p>
         </div>
 
@@ -132,10 +192,8 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
           className="py-1.5 px-2.5 text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer font-medium"
         >
           <option value="Wszystkie kluby">Wszystkie kluby</option>
-          {clubs.filter((c) => !isAllClubs(c)).map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
+          {clubs.filter((club) => !isAllClubs(club)).map((club) => (
+            <option key={club} value={club}>{club}</option>
           ))}
         </select>
       </div>
@@ -143,40 +201,40 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <MetricCard
           label="Średni błąd prognozy"
-          value={formatPercent(businessKpis.mape)}
-          subtext={`MAE: około ${formatNumber(businessKpis.mae)} osób`}
-          tooltip="MAPE i MAE wyliczone wyłącznie z prognoz, dla których istnieje rzeczywisty outcome."
+          value={formatPercent(headlineKpis.mape)}
+          subtext={`MAE: około ${formatNumber(headlineKpis.mae)} osób`}
+          tooltip="Headline MAPE/MAE: jedna obserwacja na zakończony mecz — ostatnia dostępna prognoza P50."
           highlight={sampleTooSmall ? 'warning' : 'normal'}
         />
 
         <MetricCard
           label="Mediana błędu"
-          value={`${formatNumber(businessKpis.medianError)} osób`}
-          subtext="Typowy błąd bez dominacji skrajnych obserwacji"
-          tooltip="Mediana bezwzględnego błędu prognozy dla zweryfikowanych punktów predykcji."
+          value={`${formatNumber(headlineKpis.medianError)} osób`}
+          subtext="Ostatnia prognoza per mecz"
+          tooltip="Mediana bezwzględnego błędu ostatniej prognozy P50 dla każdego zakończonego meczu."
         />
 
         <MetricCard
           label="Prognozy w zakresie ±5%"
-          value={formatPercent(businessKpis.accuracyWithin5Pct)}
+          value={formatPercent(headlineKpis.accuracyWithin5Pct)}
           subtext={sampleTooSmall ? 'Wynik wstępny' : 'Ścisły próg trafności'}
-          tooltip="Odsetek zweryfikowanych prognoz, których bezwzględny błąd procentowy nie przekroczył 5%."
-          highlight={accuracyHighlight(businessKpis.accuracyWithin5Pct)}
+          tooltip="Odsetek zakończonych meczów, dla których ostatnia prognoza P50 pomyliła się maksymalnie o 5%."
+          highlight={accuracyHighlight(headlineKpis.accuracyWithin5Pct)}
         />
 
         <MetricCard
           label="Prognozy w zakresie ±10%"
-          value={formatPercent(businessKpis.accuracyWithin10Pct)}
+          value={formatPercent(headlineKpis.accuracyWithin10Pct)}
           subtext={sampleTooSmall ? 'Za mała próba do wniosku' : within10Strong ? 'Stabilny wynik' : within10Moderate ? 'Wymaga poprawy' : 'Poniżej celu'}
-          tooltip="Odsetek zweryfikowanych prognoz, których bezwzględny błąd procentowy nie przekroczył 10%."
-          highlight={accuracyHighlight(businessKpis.accuracyWithin10Pct)}
+          tooltip="Odsetek zakończonych meczów, dla których ostatnia prognoza P50 pomyliła się maksymalnie o 10%."
+          highlight={accuracyHighlight(headlineKpis.accuracyWithin10Pct)}
         />
 
         <MetricCard
           label="Ocenione mecze"
-          value={businessKpis.evaluatedMatchesCount}
-          subtext={`${businessKpis.totalEvaluatedForecasts} punktów predykcji`}
-          tooltip="Liczba zakończonych spotkań z outcome'em i co najmniej jedną prognozą."
+          value={headlineKpis.evaluatedMatchesCount}
+          subtext={`${businessKpis.totalEvaluatedForecasts} punktów do analizy horyzontów`}
+          tooltip="Headline używa jednej prognozy per mecz; wszystkie zapisane prognozy służą osobno do analizy horyzontów."
           highlight={sampleTooSmall ? 'warning' : 'normal'}
         />
       </div>
@@ -198,7 +256,7 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
               Jak zmienia się błąd wraz z czasem do meczu?
             </h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Wyniki tylko dla horyzontów, w których mamy zweryfikowane punkty predykcji
+              Tu wykorzystujemy wszystkie zweryfikowane punkty predykcji, ponieważ analizujemy konkretny horyzont
             </p>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1 rounded">
