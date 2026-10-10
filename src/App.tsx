@@ -8,6 +8,8 @@ import { SalesAnalyticsPage } from './pages/SalesAnalyticsPage';
 import { ForecastAccuracyPage } from './pages/ForecastAccuracyPage';
 import { DataQualityPage } from './pages/DataQualityPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ResearchReadinessPanel } from './components/research/ResearchReadinessPanel';
+import { DemandSignalsPanel } from './components/research/DemandSignalsPanel';
 import { eventsService } from './services/eventsService';
 
 export default function App() {
@@ -98,7 +100,10 @@ export default function App() {
           className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto"
         >
           {selectedEventId ? (
-            <EventDetailPage eventId={selectedEventId} onBack={handleBackToEvents} />
+            <div className="space-y-6">
+              <EventDetailPage eventId={selectedEventId} onBack={handleBackToEvents} />
+              <DemandSignalsPanel eventId={selectedEventId} />
+            </div>
           ) : (
             <>
               {currentTab === 'overview' && (
@@ -126,10 +131,13 @@ export default function App() {
               )}
 
               {currentTab === 'forecast-accuracy' && (
-                <ForecastAccuracyPage
-                  selectedClubFilter={selectedClubContext}
-                  onClubFilterChange={setSelectedClubContext}
-                />
+                <div className="space-y-6">
+                  <ResearchReadinessPanel />
+                  <ForecastAccuracyPage
+                    selectedClubFilter={selectedClubContext}
+                    onClubFilterChange={setSelectedClubContext}
+                  />
+                </div>
               )}
 
               {currentTab === 'data-quality' && (
