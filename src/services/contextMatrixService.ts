@@ -11,6 +11,7 @@ export type ContextCollectionStatus =
   | 'active_manual'
   | 'verified_registry'
   | 'shadow_automated'
+  | 'degraded_automation'
   | 'planned'
   | 'blocked_external_access';
 
