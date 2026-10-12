@@ -9,6 +9,7 @@ import { ForecastAccuracyPage } from './pages/ForecastAccuracyPage';
 import { DataQualityPage } from './pages/DataQualityPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ResearchReadinessPanel } from './components/research/ResearchReadinessPanel';
+import { WeatherResearchPanel } from './components/research/WeatherResearchPanel';
 import { DemandSignalsPanel } from './components/research/DemandSignalsPanel';
 import { eventsService } from './services/eventsService';
 
@@ -133,6 +134,7 @@ export default function App() {
               {currentTab === 'forecast-accuracy' && (
                 <div className="space-y-6">
                   <ResearchReadinessPanel />
+                  <WeatherResearchPanel />
                   <ForecastAccuracyPage
                     selectedClubFilter={selectedClubContext}
                     onClubFilterChange={setSelectedClubContext}
