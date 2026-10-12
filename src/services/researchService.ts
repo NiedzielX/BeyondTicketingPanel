@@ -1,16 +1,32 @@
 import { fetchRows } from './supabaseRest';
 
 export interface ResearchReadiness {
-  independentOutcomeEvents: number;
-  clubsWithOutcome: number;
+  crossClubStudyEvents: number;
+  crossClubStudyClubs: number;
   strictStudyRows: number;
-  modelsWithStrictRows: number;
   crossClubGateMet: boolean;
-  learnedCorrectionGateMet: boolean;
-  status: string;
   crossClubEventTarget: number;
   crossClubClubTarget: number;
+  independentOutcomeEventsTotal: number;
+  outcomeClubsTotal: number;
+  learnedCorrectionGateMet: boolean;
   learnedCorrectionEventTarget: number;
+  generatedAt: string;
+}
+
+export interface WeatherResearchStatus {
+  historicalStudyVersion: string;
+  historicalSampleSize: number;
+  historicalSeasons: number;
+  baselineMae: number;
+  loocvWeatherMae: number;
+  loocvUplift: number;
+  losoWeatherMae: number;
+  losoUplift: number;
+  historicalSignalStatus: string;
+  prospectiveWeatherEvents: number;
+  prospectiveWeatherRows: number;
+  prospectiveT24OutcomePairs: number;
   generatedAt: string;
 }
 
@@ -57,16 +73,32 @@ export interface EventWeatherState {
 }
 
 interface ReadinessRow {
-  independent_outcome_events: number;
-  clubs_with_outcome: number;
+  crossclub_study_events: number;
+  crossclub_study_clubs: number;
   strict_study_rows: number;
-  models_with_strict_rows: number;
-  cross_club_gate_met: boolean;
+  crossclub_gate_met: boolean;
+  crossclub_event_target: number;
+  crossclub_club_target: number;
+  independent_outcome_events_total: number;
+  outcome_clubs_total: number;
   learned_correction_gate_met: boolean;
-  status: string;
-  cross_club_event_target: number;
-  cross_club_club_target: number;
   learned_correction_event_target: number;
+  generated_at: string;
+}
+
+interface WeatherResearchRow {
+  historical_study_version: string;
+  historical_sample_size: number;
+  historical_seasons: number;
+  baseline_mae: number;
+  loocv_weather_mae: number;
+  loocv_uplift: number;
+  loso_weather_mae: number;
+  loso_uplift: number;
+  historical_signal_status: string;
+  prospective_weather_events: number;
+  prospective_weather_rows: number;
+  prospective_t24_outcome_pairs: number;
   generated_at: string;
 }
 
@@ -117,23 +149,47 @@ const num = (value: number | null | undefined): number | undefined =>
 
 class ResearchService {
   async getReadiness(): Promise<ResearchReadiness | null> {
-    const rows = await fetchRows<ReadinessRow>('dashboard_ml_readiness_v1', {
+    const rows = await fetchRows<ReadinessRow>('dashboard_research_readiness_v2', {
       select:
-        'independent_outcome_events,clubs_with_outcome,strict_study_rows,models_with_strict_rows,cross_club_gate_met,learned_correction_gate_met,status,cross_club_event_target,cross_club_club_target,learned_correction_event_target,generated_at'
+        'crossclub_study_events,crossclub_study_clubs,strict_study_rows,crossclub_gate_met,crossclub_event_target,crossclub_club_target,independent_outcome_events_total,outcome_clubs_total,learned_correction_gate_met,learned_correction_event_target,generated_at'
     });
     const row = rows[0];
     if (!row) return null;
     return {
-      independentOutcomeEvents: Number(row.independent_outcome_events),
-      clubsWithOutcome: Number(row.clubs_with_outcome),
+      crossClubStudyEvents: Number(row.crossclub_study_events),
+      crossClubStudyClubs: Number(row.crossclub_study_clubs),
       strictStudyRows: Number(row.strict_study_rows),
-      modelsWithStrictRows: Number(row.models_with_strict_rows),
-      crossClubGateMet: row.cross_club_gate_met,
+      crossClubGateMet: row.crossclub_gate_met,
+      crossClubEventTarget: Number(row.crossclub_event_target),
+      crossClubClubTarget: Number(row.crossclub_club_target),
+      independentOutcomeEventsTotal: Number(row.independent_outcome_events_total),
+      outcomeClubsTotal: Number(row.outcome_clubs_total),
       learnedCorrectionGateMet: row.learned_correction_gate_met,
-      status: row.status,
-      crossClubEventTarget: Number(row.cross_club_event_target),
-      crossClubClubTarget: Number(row.cross_club_club_target),
       learnedCorrectionEventTarget: Number(row.learned_correction_event_target),
+      generatedAt: row.generated_at
+    };
+  }
+
+  async getWeatherResearchStatus(): Promise<WeatherResearchStatus | null> {
+    const rows = await fetchRows<WeatherResearchRow>('dashboard_weather_research_v1', {
+      select:
+        'historical_study_version,historical_sample_size,historical_seasons,baseline_mae,loocv_weather_mae,loocv_uplift,loso_weather_mae,loso_uplift,historical_signal_status,prospective_weather_events,prospective_weather_rows,prospective_t24_outcome_pairs,generated_at'
+    });
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      historicalStudyVersion: row.historical_study_version,
+      historicalSampleSize: Number(row.historical_sample_size),
+      historicalSeasons: Number(row.historical_seasons),
+      baselineMae: Number(row.baseline_mae),
+      loocvWeatherMae: Number(row.loocv_weather_mae),
+      loocvUplift: Number(row.loocv_uplift),
+      losoWeatherMae: Number(row.loso_weather_mae),
+      losoUplift: Number(row.loso_uplift),
+      historicalSignalStatus: row.historical_signal_status,
+      prospectiveWeatherEvents: Number(row.prospective_weather_events),
+      prospectiveWeatherRows: Number(row.prospective_weather_rows),
+      prospectiveT24OutcomePairs: Number(row.prospective_t24_outcome_pairs),
       generatedAt: row.generated_at
     };
   }
