@@ -22,7 +22,6 @@ export default function App() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
 
-  // Club context for ticketing manager POC demo
   const [selectedClubContext, setSelectedClubContext] = useState<string>('Lech Poznań');
   const [clubsList, setClubsList] = useState<string[]>([]);
 
@@ -132,13 +131,22 @@ export default function App() {
               )}
 
               {currentTab === 'forecast-accuracy' && (
+                <ForecastAccuracyPage
+                  selectedClubFilter={selectedClubContext}
+                  onClubFilterChange={setSelectedClubContext}
+                />
+              )}
+
+              {currentTab === 'model-lab' && (
                 <div className="space-y-6">
+                  <div className="border-b border-zinc-200 dark:border-zinc-800 pb-4">
+                    <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Model Lab</h1>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                      Wewnętrzny evidence layer Beyond: readiness, eksperymenty i sygnały badawcze. Nic z tej sekcji nie jest automatycznie promowane do produkcyjnego forecastu.
+                    </p>
+                  </div>
                   <ResearchReadinessPanel />
                   <WeatherResearchPanel />
-                  <ForecastAccuracyPage
-                    selectedClubFilter={selectedClubContext}
-                    onClubFilterChange={setSelectedClubContext}
-                  />
                 </div>
               )}
 
