@@ -74,45 +74,48 @@ export const FeaturedMatchCard: React.FC<FeaturedMatchCardProps> = ({
       <div className="p-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
         <div className="lg:col-span-5 space-y-3">
           <div>
-            <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider block">{event.competition} · Stadion {event.club}</span>
+            <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider block">{event.competition} · {event.club}</span>
             <h3 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mt-0.5">{event.name}</h3>
           </div>
+          <p className="text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed">
+            Na dziś przewidujemy około{' '}
+            <strong className="text-zinc-900 dark:text-zinc-100 font-semibold tabular-nums">{event.currentForecast ? formatNumber(event.currentForecast) : '—'} widzów</strong>.
+            {event.utilizationRate !== undefined && <> To około <strong className="text-zinc-900 dark:text-zinc-100">{formatPercent(event.utilizationRate)}</strong> pojemności stadionu.</>}
+          </p>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-            Beyond prognozuje końcową frekwencję na poziomie{' '}
-            <strong className="text-zinc-900 dark:text-zinc-100 font-semibold tabular-nums">{event.currentForecast ? formatNumber(event.currentForecast) : '—'} osób</strong>{' '}
-            ({event.utilizationRate ? formatPercent(event.utilizationRate) : '—'} pojemności). Publicznie dostępne inventory:{' '}
-            <strong className="text-zinc-900 dark:text-zinc-100 font-semibold tabular-nums">{formatNumber(event.inventoryAvailable ?? event.remainingCapacity)}</strong>.
+            Publiczny system pokazuje obecnie <strong>{formatNumber(event.inventoryAvailable ?? event.remainingCapacity)}</strong> wolnych miejsc. To informacja o widocznej dostępności, nie o rzeczywistej liczbie niesprzedanych biletów.
           </p>
           <button onClick={() => onSelectEvent(event.id)} className="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors cursor-pointer shadow-xs">
-            <span>Przejdź do pełnej analizy meczu</span><ArrowRight className="w-3.5 h-3.5" />
+            <span>Zobacz szczegóły meczu</span><ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
         <div className="lg:col-span-4 grid grid-cols-2 gap-3 border-y lg:border-y-0 lg:border-x border-zinc-100 dark:border-zinc-800 py-4 lg:py-0 lg:px-4">
           <div className="space-y-1">
-            <span className="text-[11px] font-medium text-zinc-400 block">Sygnał popytu (proxy)</span>
-            <div className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">{formatNumber(event.currentSold)}</div>
-            <div className="flex items-center gap-1.5 text-xs text-zinc-500"><span className="font-semibold text-zinc-800 dark:text-zinc-200">{formatPercent(event.currentUtilization)}</span><span>zajętości proxy</span></div>
+            <span className="text-[11px] font-medium text-zinc-400 block">Widoczne wolne miejsca</span>
+            <div className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">{formatNumber(event.inventoryAvailable ?? event.remainingCapacity)}</div>
+            <div className="text-[10px] text-zinc-400">publiczna dostępność</div>
           </div>
           <div className="space-y-1">
-            <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 font-semibold block">Prognoza frekwencji P50</span>
+            <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 font-semibold block">Przewidywana frekwencja</span>
             <div className="text-xl font-bold text-indigo-700 dark:text-indigo-400 tabular-nums">{event.currentForecast ? formatNumber(event.currentForecast) : '—'}</div>
-            <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium"><span>Fill-rate:</span><strong>{event.utilizationRate ? formatPercent(event.utilizationRate) : '—'}</strong></div>
+            <div className="text-[10px] text-zinc-400">najbardziej prawdopodobny wynik</div>
           </div>
           <div className="space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
-            <span className="text-[11px] font-medium text-zinc-400 block">Pojemność referencyjna</span>
-            <div className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 tabular-nums">{formatNumber(event.capacity)} miejsc</div>
+            <span className="text-[11px] font-medium text-zinc-400 block">Szacowane zajęcie teraz</span>
+            <div className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 tabular-nums">{formatPercent(event.currentUtilization)}</div>
+            <span className="text-[10px] text-zinc-400">na podstawie widocznych miejsc</span>
           </div>
           <div className="space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
-            <span className="text-[11px] font-medium text-zinc-400 block">Publicznie dostępne</span>
-            <div className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 tabular-nums">{formatNumber(event.inventoryAvailable ?? event.remainingCapacity)}</div>
-            <span className="text-[10px] text-zinc-400">inventory, nie potwierdzona sprzedaż</span>
+            <span className="text-[11px] font-medium text-zinc-400 block">Przewidywane wypełnienie</span>
+            <div className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 tabular-nums">{event.utilizationRate !== undefined ? formatPercent(event.utilizationRate) : '—'}</div>
+            <span className="text-[10px] text-zinc-400">według obecnej prognozy</span>
           </div>
         </div>
 
         <div className="lg:col-span-3 flex flex-col justify-between h-full space-y-2">
           <div className="flex items-center justify-between text-[11px] text-zinc-500">
-            <span className="font-medium text-zinc-700 dark:text-zinc-300">Trajektoria proxy i forecast</span>
+            <span className="font-medium text-zinc-700 dark:text-zinc-300">Jak zmienia się sytuacja</span>
             <span className="text-[10px] text-zinc-400">-{event.daysToEvent} d</span>
           </div>
           <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800 p-2">
@@ -128,8 +131,8 @@ export const FeaturedMatchCard: React.FC<FeaturedMatchCardProps> = ({
             </svg>
           </div>
           <div className="flex items-center justify-between text-[10px] text-zinc-400">
-            <span className="flex items-center gap-1"><span className="w-2 h-0.5 bg-indigo-600" />Inventory proxy</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-0.5 border-t border-dashed border-emerald-500" />Prognoza P50</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-0.5 bg-indigo-600" />Sygnał zainteresowania</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-0.5 border-t border-dashed border-emerald-500" />Prognoza frekwencji</span>
           </div>
         </div>
       </div>
