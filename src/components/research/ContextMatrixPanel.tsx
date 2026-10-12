@@ -1,0 +1,163 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { Database, FlaskConical, ShieldCheck } from 'lucide-react';
+import {
+  ContextMatrixItem,
+  ContextProductionRole,
+  contextMatrixService
+} from '../../services/contextMatrixService';
+
+const GROUP_ORDER = ['ticketing', 'sporting', 'hype', 'match_context', 'weather', 'data_quality'];
+
+const GROUP_LABELS: Record<string, string> = {
+  ticketing: 'Live Ticketing',
+  sporting: 'Sporting Context',
+  hype: 'Attention & Hype',
+  match_context: 'Match Context',
+  weather: 'Weather',
+  data_quality: 'Data Quality'
+};
+
+const roleLabel = (role: ContextProductionRole): string => {
+  switch (role) {
+    case 'active_prior':
+      return 'Priorytet badawczy';
+    case 'shadow':
+      return 'Shadow';
+    case 'data_quality_modifier':
+      return 'Jakość danych';
+    default:
+      return 'Referencyjne';
+  }
+};
+
+export const ContextMatrixPanel: React.FC = () => {
+  const [items, setItems] = useState<ContextMatrixItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    contextMatrixService
+      .getMatrix()
+      .then((rows) => {
+        if (mounted) setItems(rows);
+      })
+      .finally(() => {
+        if (mounted) setIsLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const groups = useMemo(() => {
+    return GROUP_ORDER.map((groupKey) => {
+      const rows = items.filter((item) => item.groupKey === groupKey);
+      return {
+        groupKey,
+        label: GROUP_LABELS[groupKey] ?? groupKey,
+        weight: rows.reduce((sum, item) => sum + item.weightPct, 0),
+        rows
+      };
+    }).filter((group) => group.rows.length > 0);
+  }, [items]);
+
+  const activeWeight = useMemo(
+    () => items.filter((item) => item.productionRole === 'active_prior').reduce((sum, item) => sum + item.weightPct, 0),
+    [items]
+  );
+
+  if (isLoading) {
+    return (
+      <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 text-xs text-zinc-500">
+        Ładowanie Context Matrix...
+      </div>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 sm:p-5 shadow-xs">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 mb-5">
+        <div>
+          <div className="flex items-center gap-2">
+            <FlaskConical className="w-4 h-4 text-indigo-600" />
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Context Matrix v0.1</h2>
+          </div>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 max-w-3xl">
+            To nasza mapa priorytetów badawczych: jakie sygnały zbieramy, skąd je bierzemy i którym obszarom dajemy pierwszeństwo w walidacji.
+          </p>
+        </div>
+        <span className="inline-flex w-fit items-center rounded-full border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50 dark:bg-indigo-950/20 px-2.5 py-1 text-[10px] font-semibold text-indigo-700 dark:text-indigo-300">
+          Wagi nie są współczynnikami modelu
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 mb-5">
+        {groups.map((group) => (
+          <div key={group.groupKey} className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-400">{group.label}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-zinc-900 dark:text-zinc-100">{group.weight}%</p>
+            <p className="mt-0.5 text-[10px] text-zinc-500">{group.rows.length} sygnałów</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-zinc-50 dark:bg-zinc-950/70 text-[10px] uppercase tracking-wide text-zinc-400">
+              <tr>
+                <th className="px-3 py-2.5 font-medium">Sygnał</th>
+                <th className="px-3 py-2.5 font-medium">Obszar</th>
+                <th className="px-3 py-2.5 font-medium text-right">Waga</th>
+                <th className="px-3 py-2.5 font-medium">Główne źródło</th>
+                <th className="px-3 py-2.5 font-medium">Odświeżanie</th>
+                <th className="px-3 py-2.5 font-medium">Rola</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              {groups.flatMap((group) =>
+                group.rows
+                  .slice()
+                  .sort((a, b) => b.weightPct - a.weightPct)
+                  .map((item) => (
+                    <tr key={item.featureKey} className="align-top">
+                      <td className="px-3 py-3 min-w-[210px]">
+                        <p className="font-medium text-zinc-900 dark:text-zinc-100">{item.displayName}</p>
+                        <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-400">{item.description}</p>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-zinc-500">{group.label}</td>
+                      <td className="px-3 py-3 text-right font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">{item.weightPct}%</td>
+                      <td className="px-3 py-3 min-w-[190px] text-zinc-600 dark:text-zinc-300">
+                        <div className="flex items-start gap-1.5">
+                          <Database className="w-3 h-3 mt-0.5 shrink-0 text-zinc-400" />
+                          <span>{item.primarySource ?? 'Do ustalenia'}</span>
+                        </div>
+                        {item.fallbackSource && <p className="mt-1 pl-[18px] text-[10px] text-zinc-400">Fallback: {item.fallbackSource}</p>}
+                      </td>
+                      <td className="px-3 py-3 min-w-[140px] text-zinc-500">{item.refreshCadence ?? '—'}</td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span className="inline-flex rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-600 dark:text-zinc-300">
+                          {roleLabel(item.productionRole)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+        <div className="rounded-lg bg-zinc-50 dark:bg-zinc-950/60 p-3 text-zinc-600 dark:text-zinc-300">
+          <div className="flex items-center gap-1.5 font-medium text-zinc-800 dark:text-zinc-200"><ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />Aktywne priorytety sumują się do {activeWeight}%</div>
+          <p className="mt-1 text-zinc-500">Służy to do ustalenia kolejności badań i interpretacji sygnałów, a nie do mechanicznego ważenia prognozy.</p>
+        </div>
+        <div className="rounded-lg bg-zinc-50 dark:bg-zinc-950/60 p-3 text-zinc-600 dark:text-zinc-300">
+          <p className="font-medium text-zinc-800 dark:text-zinc-200">Warunek wejścia do P50</p>
+          <p className="mt-1 text-zinc-500">Każdy kontekst musi najpierw pokazać dodatni uplift poza próbą względem właściwego baseline. Sam wysoki research-prior nie wystarcza.</p>
+        </div>
+      </div>
+    </section>
+  );
+};
