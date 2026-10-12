@@ -5,11 +5,12 @@ import { researchService, ResearchReadiness } from '../../services/researchServi
 const progress = (value: number, target: number) =>
   target > 0 ? Math.max(0, Math.min(100, (value / target) * 100)) : 0;
 
-const Gate: React.FC<{ label: string; value: number; target: number; met?: boolean }> = ({
+const Gate: React.FC<{ label: string; value: number; target: number; met?: boolean; note?: string }> = ({
   label,
   value,
   target,
-  met
+  met,
+  note
 }) => (
   <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3.5">
     <div className="flex items-center justify-between text-xs mb-2">
@@ -24,6 +25,7 @@ const Gate: React.FC<{ label: string; value: number; target: number; met?: boole
         style={{ width: `${progress(value, target)}%` }}
       />
     </div>
+    {note && <div className="mt-2 text-[10px] text-zinc-400">{note}</div>}
   </div>
 );
 
@@ -37,10 +39,10 @@ export const ResearchReadinessPanel: React.FC = () => {
   if (!data) return null;
 
   const status = data.learnedCorrectionGateMet
-    ? 'Gotowe do benchmarku live-correction challenger'
+    ? 'Evidence gate osiągnięty — challenger benchmark, bez auto-promocji'
     : data.crossClubGateMet
-    ? 'Cross-club study gotowe — bez promocji modelu'
-    : 'Zbieramy niezależne outcome’y';
+    ? 'Cross-club study gotowe — learned correction nadal zablokowane'
+    : 'Zbieramy leakage-safe eventy do cross-club study';
 
   return (
     <div className="rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/30 dark:bg-indigo-950/10 p-4 sm:p-5">
@@ -48,9 +50,9 @@ export const ResearchReadinessPanel: React.FC = () => {
         <div className="flex items-start gap-2.5">
           <FlaskConical className="w-4 h-4 mt-0.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
           <div>
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Live Signal Research Readiness</h2>
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Live Signal Research Readiness · v2</h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              Gate’y badawcze liczone po niezależnych meczach, nie po snapshotach.
+              Cross-club gate liczy tylko eventy z leakage-safe baseline + canonical live features. Snapshoty nie są niezależnymi próbkami.
             </p>
           </div>
         </div>
@@ -62,29 +64,30 @@ export const ResearchReadinessPanel: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Gate
-          label="Independent outcomes"
-          value={data.independentOutcomeEvents}
+          label="Cross-club study events"
+          value={data.crossClubStudyEvents}
           target={data.crossClubEventTarget}
-          met={data.independentOutcomeEvents >= data.crossClubEventTarget}
+          met={data.crossClubGateMet}
+          note={`${data.strictStudyRows} strict canonical rows`}
         />
         <Gate
-          label="Kluby z outcome"
-          value={data.clubsWithOutcome}
+          label="Kluby w leakage-safe study"
+          value={data.crossClubStudyClubs}
           target={data.crossClubClubTarget}
-          met={data.clubsWithOutcome >= data.crossClubClubTarget}
+          met={data.crossClubStudyClubs >= data.crossClubClubTarget}
+          note={`${data.outcomeClubsTotal} klubów ma już outcome`}
         />
         <Gate
-          label="Live-correction gate"
-          value={data.independentOutcomeEvents}
+          label="Learned correction evidence"
+          value={data.independentOutcomeEventsTotal}
           target={data.learnedCorrectionEventTarget}
           met={data.learnedCorrectionGateMet}
+          note="20 meczów = dopiero challenger benchmark, nie automatyczna promocja"
         />
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-zinc-500 dark:text-zinc-400">
-        <span>Strict study rows: <strong className="text-zinc-700 dark:text-zinc-300">{data.strictStudyRows}</strong></span>
-        <span>Modele ze strict rows: <strong className="text-zinc-700 dark:text-zinc-300">{data.modelsWithStrictRows}</strong></span>
-        <span>Cross-club gate: <strong className={data.crossClubGateMet ? 'text-emerald-600' : 'text-amber-600'}>{data.crossClubGateMet ? 'spełniony' : 'nie spełniony'}</strong></span>
+      <div className="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+        Zweryfikowane outcome’y ogółem: <strong className="text-zinc-700 dark:text-zinc-300">{data.independentOutcomeEventsTotal}</strong> · cross-club study-ready: <strong className="text-zinc-700 dark:text-zinc-300">{data.crossClubStudyEvents}</strong>. Te liczby celowo nie są utożsamiane.
       </div>
     </div>
   );
