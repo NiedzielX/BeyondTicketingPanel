@@ -49,27 +49,23 @@ export const EventsTable: React.FC<EventsTableProps> = ({
               <div className="flex items-center gap-1"><span>Mecz</span>{renderSortIcon('name')}</div>
             </th>
             <th className="py-3 px-3 cursor-pointer select-none group" onClick={() => onSort?.('date')}>
-              <div className="flex items-center gap-1"><span>Data</span>{renderSortIcon('date')}</div>
+              <div className="flex items-center gap-1"><span>Kiedy</span>{renderSortIcon('date')}</div>
             </th>
-            <th className="py-3 px-3 text-right cursor-pointer select-none group" onClick={() => onSort?.('sold')}>
-              <div className="flex items-center justify-end gap-1"><span>Sygnał popytu (proxy)</span>{renderSortIcon('sold')}</div>
+            <th className="py-3 px-3 text-right cursor-pointer select-none group" onClick={() => onSort?.('remaining')}>
+              <div className="flex items-center justify-end gap-1"><span>Widoczne wolne miejsca</span>{renderSortIcon('remaining')}</div>
             </th>
             <th className="py-3 px-3 text-right cursor-pointer select-none group" onClick={() => onSort?.('utilization')}>
-              <div className="flex items-center justify-end gap-1"><span>Zajętość proxy</span>{renderSortIcon('utilization')}</div>
+              <div className="flex items-center justify-end gap-1"><span>Szacowane zajęcie teraz</span>{renderSortIcon('utilization')}</div>
             </th>
             <th className="py-3 px-3 text-right cursor-pointer select-none group" onClick={() => onSort?.('forecast')}>
-              <div className="flex items-center justify-end gap-1"><span>Prognoza frekwencji</span>{renderSortIcon('forecast')}</div>
+              <div className="flex items-center justify-end gap-1"><span>Przewidywana frekwencja</span>{renderSortIcon('forecast')}</div>
             </th>
-            <th className="py-3 px-3 text-right">Prognozowane wypełnienie</th>
-            <th className="py-3 px-3 text-right cursor-pointer select-none group" onClick={() => onSort?.('remaining')}>
-              <div className="flex items-center justify-end gap-1"><span>Publicznie dostępne</span>{renderSortIcon('remaining')}</div>
-            </th>
-            <th className="py-3 px-3">Trend</th>
-            <th className="py-3 px-3">Status</th>
+            <th className="py-3 px-3">Co się dzieje?</th>
+            <th className="py-3 px-3">Ocena</th>
             {showOutcomeColumns && (
               <>
                 <th className="py-3 px-3 text-right">Rzeczywista frekwencja</th>
-                <th className="py-3 px-3 text-right">Błąd</th>
+                <th className="py-3 px-3 text-right">Błąd prognozy</th>
               </>
             )}
             <th className="py-3 px-2 w-8"></th>
@@ -81,30 +77,28 @@ export const EventsTable: React.FC<EventsTableProps> = ({
               <td className="py-3.5 px-4 font-medium text-zinc-900 dark:text-zinc-100">
                 <div className="flex flex-col">
                   <span className="group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors font-semibold">{ev.name}</span>
-                  <span className="text-[11px] text-zinc-400 font-normal">{ev.competition} · Stadion {ev.club}</span>
+                  <span className="text-[11px] text-zinc-400 font-normal">{ev.competition} · {ev.club}</span>
                 </div>
               </td>
               <td className="py-3.5 px-3 tabular-nums text-zinc-600 dark:text-zinc-300 whitespace-nowrap">
                 <div>{formatDateShort(ev.eventDate)}</div>
                 <span className="text-[10px] text-zinc-400 font-normal">{formatDaysRemaining(ev.daysToEvent)}</span>
               </td>
-              <td className="py-3.5 px-3 text-right tabular-nums font-semibold text-zinc-900 dark:text-zinc-100" title="Pojemność referencyjna minus publicznie dostępne inventory; nie jest to potwierdzona sprzedaż.">
-                {formatNumber(ev.currentSold)}
+              <td className="py-3.5 px-3 text-right tabular-nums text-zinc-700 dark:text-zinc-300" title="Liczba miejsc widocznych jako dostępne w publicznym systemie biletowym. Nie jest to liczba niesprzedanych biletów.">
+                <span className="font-semibold text-zinc-900 dark:text-zinc-100">{formatNumber(ev.inventoryAvailable ?? ev.remainingCapacity)}</span>
+                <span className="block text-[10px] text-zinc-400">widoczne publicznie</span>
               </td>
-              <td className="py-3.5 px-3 text-right tabular-nums text-zinc-700 dark:text-zinc-300 font-medium">{formatPercent(ev.currentUtilization)}</td>
-              <td className="py-3.5 px-3 text-right tabular-nums font-bold text-indigo-700 dark:text-indigo-400">
-                {ev.currentForecast !== undefined ? formatNumber(ev.currentForecast) : <span className="text-zinc-400 font-normal">Brak</span>}
+              <td className="py-3.5 px-3 text-right tabular-nums text-zinc-700 dark:text-zinc-300 font-medium" title="Szacunek na podstawie pojemności referencyjnej i widocznych wolnych miejsc. To nie jest potwierdzona sprzedaż.">
+                {formatPercent(ev.currentUtilization)}
+                <span className="block text-[10px] text-zinc-400">szacunek</span>
               </td>
               <td className="py-3.5 px-3 text-right tabular-nums">
-                {ev.utilizationRate !== undefined ? (
-                  <span className={`font-semibold ${ev.utilizationRate >= 85 ? 'text-emerald-600 dark:text-emerald-400' : ev.utilizationRate < 60 ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-800 dark:text-zinc-200'}`}>
-                    {formatPercent(ev.utilizationRate)}
-                  </span>
-                ) : <span className="text-zinc-400">—</span>}
-              </td>
-              <td className="py-3.5 px-3 text-right tabular-nums text-zinc-600 dark:text-zinc-400">
-                <span className="font-medium text-zinc-800 dark:text-zinc-200">{formatNumber(ev.inventoryAvailable ?? ev.remainingCapacity)}</span>
-                <span className="block text-[10px] text-zinc-400">publiczne inventory</span>
+                {ev.currentForecast !== undefined ? (
+                  <>
+                    <span className="font-bold text-indigo-700 dark:text-indigo-400">{formatNumber(ev.currentForecast)}</span>
+                    <span className="block text-[10px] text-zinc-400">{ev.utilizationRate !== undefined ? `${formatPercent(ev.utilizationRate)} stadionu` : 'obecna prognoza'}</span>
+                  </>
+                ) : <span className="text-zinc-400 font-normal">Jeszcze brak</span>}
               </td>
               <td className="py-3.5 px-3 whitespace-nowrap"><TrendIndicator trend={ev.trend} /></td>
               <td className="py-3.5 px-3 whitespace-nowrap"><CommercialStatusBadge status={ev.commercialStatus} /></td>
