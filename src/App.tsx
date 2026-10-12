@@ -14,6 +14,7 @@ import { WeatherResearchPanel } from './components/research/WeatherResearchPanel
 import { DemandSignalsPanel } from './components/research/DemandSignalsPanel';
 import { SportingContextPanel } from './components/research/SportingContextPanel';
 import { AttentionHypePanel } from './components/research/AttentionHypePanel';
+import { ContextMatrixPanel } from './components/research/ContextMatrixPanel';
 import { eventsService } from './services/eventsService';
 
 export default function App() {
@@ -147,6 +148,7 @@ export default function App() {
                       Zaplecze badawcze Beyond. Tutaj sprawdzamy, czy mamy dość danych i czy nowe sygnały naprawdę poprawiają prognozę. Nic z tej sekcji nie trafia automatycznie do głównego modelu.
                     </p>
                   </div>
+                  <ContextMatrixPanel />
                   <ResearchReadinessPanel />
                   <WeatherResearchPanel />
                 </div>
