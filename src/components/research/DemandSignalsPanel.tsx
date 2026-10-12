@@ -135,8 +135,13 @@ export const DemandSignalsPanel: React.FC<Props> = ({ eventId }) => {
           <div className="flex items-start gap-2.5">
             <CloudRain className="w-4 h-4 mt-0.5 text-sky-600 dark:text-sky-400" />
             <div>
-              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Pogoda na kickoff</h2>
-              <p className="text-xs text-zinc-500 mt-0.5">Forecast zapisany prospektywnie — nie pogoda odczytana po meczu.</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Pogoda na kickoff</h2>
+                <span className="text-[9px] uppercase tracking-wide font-bold rounded border border-amber-300 bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900 dark:text-amber-300 px-1.5 py-0.5">
+                  Research · poza P50
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500 mt-0.5">Prospektywnie zapisane telemetry. Nie wpływa obecnie na P10/P50/P90.</p>
             </div>
           </div>
           {weather?.locationQuality && (
