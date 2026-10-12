@@ -9,6 +9,14 @@ interface AttentionHypePanelProps {
   eventId: string;
 }
 
+const samplePhrase = (count: number): string => {
+  if (count === 1) return '1 próbkę';
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return `${count} próbki`;
+  return `${count} próbek`;
+};
+
 const statusCopy = (context: AttentionContext): {
   headline: string;
   description: string;
@@ -18,14 +26,20 @@ const statusCopy = (context: AttentionContext): {
     case 'collecting_baseline':
       return {
         headline: 'Zbieramy punkt odniesienia',
-        description: `Mamy ${context.samples24h} ${context.samples24h === 1 ? 'próbkę' : 'próbki/próbek'} z ostatnich 24 godzin. Nie interpretujemy jeszcze braku dopasowań jako braku zainteresowania.`,
+        description: `Mamy ${samplePhrase(context.samples24h)} z ostatnich 24 godzin. Nie interpretujemy jeszcze braku dopasowań jako braku zainteresowania.`,
         icon: <Newspaper className="w-4 h-4 text-zinc-400" />
       };
     case 'collecting_comparison':
       return {
         headline: 'Budujemy okres porównawczy',
-        description: 'Mamy już bieżące próbki, ale potrzebujemy również poprzedniego okresu, żeby ocenić, czy zainteresowanie rzeczywiście rośnie lub słabnie.',
+        description: 'Mamy już wystarczająco dużo bieżących próbek, ale potrzebujemy również poprzedniego okresu, żeby ocenić, czy zainteresowanie rzeczywiście rośnie lub słabnie.',
         icon: <Newspaper className="w-4 h-4 text-indigo-600" />
+      };
+    case 'no_signal':
+      return {
+        headline: 'Nie wykrywamy jeszcze istotnego sygnału',
+        description: 'W obu porównywanych oknach nasze próbki nie znalazły dopasowań dla tego meczu. To nie oznacza, że o meczu nikt nie mówi — tylko że w tym źródle nie mamy jeszcze mierzalnego sygnału.',
+        icon: <Newspaper className="w-4 h-4 text-zinc-400" />
       };
     case 'rising':
       return {
@@ -91,7 +105,8 @@ export const AttentionHypePanel: React.FC<AttentionHypePanelProps> = ({ eventId 
   const hasComparableWindows =
     context.attentionStatus === 'rising' ||
     context.attentionStatus === 'falling' ||
-    context.attentionStatus === 'stable';
+    context.attentionStatus === 'stable' ||
+    context.attentionStatus === 'no_signal';
 
   return (
     <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 sm:p-5 shadow-xs">
@@ -130,7 +145,7 @@ export const AttentionHypePanel: React.FC<AttentionHypePanelProps> = ({ eventId 
         )}
 
         <p className="mt-4 text-[10px] leading-relaxed text-zinc-400">
-          To badawczy sygnał z próbkowanych publikacji GDELT. Nie jest pełnym licznikiem wszystkich artykułów, analizą sentymentu ani bezpośrednią miarą popytu na bilety.
+          To badawczy sygnał z próbkowanych polskich publikacji GDELT. Nie jest pełnym licznikiem wszystkich artykułów, analizą sentymentu ani bezpośrednią miarą popytu na bilety.
         </p>
       </div>
     </section>
