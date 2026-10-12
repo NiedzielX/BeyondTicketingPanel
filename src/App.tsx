@@ -12,6 +12,7 @@ import { ForecastAccuracyGuide } from './components/common/ForecastAccuracyGuide
 import { ResearchReadinessPanel } from './components/research/ResearchReadinessPanel';
 import { WeatherResearchPanel } from './components/research/WeatherResearchPanel';
 import { DemandSignalsPanel } from './components/research/DemandSignalsPanel';
+import { SportingContextPanel } from './components/research/SportingContextPanel';
 import { eventsService } from './services/eventsService';
 
 export default function App() {
@@ -97,6 +98,7 @@ export default function App() {
           {selectedEventId ? (
             <div className="space-y-6">
               <EventDetailPage eventId={selectedEventId} onBack={handleBackToEvents} />
+              <SportingContextPanel eventId={selectedEventId} />
               <DemandSignalsPanel eventId={selectedEventId} />
             </div>
           ) : (
