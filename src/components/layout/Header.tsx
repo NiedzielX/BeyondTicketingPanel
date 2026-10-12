@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, ChevronRight, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Menu, ChevronRight, RefreshCw } from 'lucide-react';
 import { NavItemKey } from './Sidebar';
 
 interface HeaderProps {
@@ -29,6 +29,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Analiza sprzedaży';
       case 'forecast-accuracy':
         return 'Trafność prognoz';
+      case 'model-lab':
+        return 'Model Lab';
       case 'data-quality':
         return 'Jakość danych';
       case 'settings':
@@ -39,7 +41,6 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 px-4 sm:px-6 backdrop-blur-xs">
       <div className="flex items-center gap-3">
-        {/* Mobile menu button */}
         <button
           onClick={onOpenMobileMenu}
           className="md:hidden p-1.5 rounded-md text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
@@ -48,11 +49,10 @@ export const Header: React.FC<HeaderProps> = ({
           <Menu className="w-5 h-5" />
         </button>
 
-        {/* Breadcrumb navigation */}
         <nav className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
           <span className="font-semibold text-zinc-900 dark:text-zinc-100">Beyond Ticketing</span>
           <ChevronRight className="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-600" />
-          
+
           {selectedEventName ? (
             <>
               <button
@@ -74,7 +74,6 @@ export const Header: React.FC<HeaderProps> = ({
         </nav>
       </div>
 
-      {/* Right controls - Klubowy styl */}
       <div className="flex items-center gap-3">
         <div className="hidden sm:flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
           <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
