@@ -15,6 +15,7 @@ import { DemandSignalsPanel } from './components/research/DemandSignalsPanel';
 import { SportingContextPanel } from './components/research/SportingContextPanel';
 import { AttentionHypePanel } from './components/research/AttentionHypePanel';
 import { ContextMatrixPanel } from './components/research/ContextMatrixPanel';
+import { SportingShadowValidationPanel } from './components/research/SportingShadowValidationPanel';
 import { eventsService } from './services/eventsService';
 
 export default function App() {
@@ -149,6 +150,7 @@ export default function App() {
                     </p>
                   </div>
                   <ContextMatrixPanel />
+                  <SportingShadowValidationPanel />
                   <ResearchReadinessPanel />
                   <WeatherResearchPanel />
                 </div>
