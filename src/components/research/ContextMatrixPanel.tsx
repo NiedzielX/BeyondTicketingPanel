@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Database, FlaskConical, ShieldCheck } from 'lucide-react';
 import {
+  ContextCollectionStatus,
   ContextMatrixItem,
   ContextProductionRole,
   contextMatrixService
@@ -27,6 +28,38 @@ const roleLabel = (role: ContextProductionRole): string => {
       return 'Jakość danych';
     default:
       return 'Referencyjne';
+  }
+};
+
+const readinessLabel = (status?: ContextCollectionStatus): string => {
+  switch (status) {
+    case 'active_automated':
+      return 'Automatycznie';
+    case 'active_manual':
+      return 'Manual research';
+    case 'shadow_automated':
+      return 'Automatycznie · shadow';
+    case 'blocked_external_access':
+      return 'Blokada źródła';
+    case 'planned':
+      return 'Planowane';
+    default:
+      return 'Nieokreślone';
+  }
+};
+
+const readinessClass = (status?: ContextCollectionStatus): string => {
+  switch (status) {
+    case 'active_automated':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300';
+    case 'active_manual':
+      return 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/20 dark:text-blue-300';
+    case 'shadow_automated':
+      return 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900/60 dark:bg-violet-950/20 dark:text-violet-300';
+    case 'blocked_external_access':
+      return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300';
+    default:
+      return 'border-zinc-200 bg-zinc-50 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300';
   }
 };
 
@@ -66,6 +99,17 @@ export const ContextMatrixPanel: React.FC = () => {
     [items]
   );
 
+  const readinessSummary = useMemo(
+    () => ({
+      automated: items.filter((item) => item.collectionStatus === 'active_automated').length,
+      manual: items.filter((item) => item.collectionStatus === 'active_manual').length,
+      shadow: items.filter((item) => item.collectionStatus === 'shadow_automated').length,
+      planned: items.filter((item) => item.collectionStatus === 'planned').length,
+      blocked: items.filter((item) => item.collectionStatus === 'blocked_external_access').length
+    }),
+    [items]
+  );
+
   if (isLoading) {
     return (
       <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 text-xs text-zinc-500">
@@ -83,7 +127,7 @@ export const ContextMatrixPanel: React.FC = () => {
             <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Context Matrix v0.1</h2>
           </div>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 max-w-3xl">
-            To nasza mapa priorytetów badawczych: jakie sygnały zbieramy, skąd je bierzemy i którym obszarom dajemy pierwszeństwo w walidacji.
+            Mapa priorytetów badawczych: jakie sygnały chcemy mierzyć, jaką mają wagę roboczą, skąd bierzemy dane i co faktycznie działa już dzisiaj.
           </p>
         </div>
         <span className="inline-flex w-fit items-center rounded-full border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50 dark:bg-indigo-950/20 px-2.5 py-1 text-[10px] font-semibold text-indigo-700 dark:text-indigo-300">
@@ -91,7 +135,7 @@ export const ContextMatrixPanel: React.FC = () => {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 mb-4">
         {groups.map((group) => (
           <div key={group.groupKey} className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
             <p className="text-[10px] uppercase tracking-wide text-zinc-400">{group.label}</p>
@@ -99,6 +143,16 @@ export const ContextMatrixPanel: React.FC = () => {
             <p className="mt-0.5 text-[10px] text-zinc-500">{group.rows.length} sygnałów</p>
           </div>
         ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-5 text-[10px]">
+        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300">{readinessSummary.automated} automatycznych</span>
+        <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/20 dark:text-blue-300">{readinessSummary.manual} manual research</span>
+        <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 font-medium text-violet-700 dark:border-violet-900/60 dark:bg-violet-950/20 dark:text-violet-300">{readinessSummary.shadow} shadow</span>
+        <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 font-medium text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{readinessSummary.planned} planowane</span>
+        {readinessSummary.blocked > 0 && (
+          <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">{readinessSummary.blocked} blokada zewnętrzna</span>
+        )}
       </div>
 
       <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
@@ -109,6 +163,7 @@ export const ContextMatrixPanel: React.FC = () => {
                 <th className="px-3 py-2.5 font-medium">Sygnał</th>
                 <th className="px-3 py-2.5 font-medium">Obszar</th>
                 <th className="px-3 py-2.5 font-medium text-right">Waga</th>
+                <th className="px-3 py-2.5 font-medium">Status danych</th>
                 <th className="px-3 py-2.5 font-medium">Główne źródło</th>
                 <th className="px-3 py-2.5 font-medium">Odświeżanie</th>
                 <th className="px-3 py-2.5 font-medium">Rola</th>
@@ -127,6 +182,12 @@ export const ContextMatrixPanel: React.FC = () => {
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-zinc-500">{group.label}</td>
                       <td className="px-3 py-3 text-right font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">{item.weightPct}%</td>
+                      <td className="px-3 py-3 min-w-[150px]">
+                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${readinessClass(item.collectionStatus)}`}>
+                          {readinessLabel(item.collectionStatus)}
+                        </span>
+                        {item.collectionNote && <p className="mt-1.5 max-w-[260px] text-[10px] leading-relaxed text-zinc-400">{item.collectionNote}</p>}
+                      </td>
                       <td className="px-3 py-3 min-w-[190px] text-zinc-600 dark:text-zinc-300">
                         <div className="flex items-start gap-1.5">
                           <Database className="w-3 h-3 mt-0.5 shrink-0 text-zinc-400" />
