@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Newspaper, TrendingDown, TrendingUp } from 'lucide-react';
+import { AlertTriangle, Newspaper, TrendingDown, TrendingUp } from 'lucide-react';
 import {
+  AttentionCollectorHealth,
   AttentionContext,
   attentionContextService
 } from '../../services/attentionContextService';
@@ -64,15 +65,21 @@ const statusCopy = (context: AttentionContext): {
 
 export const AttentionHypePanel: React.FC<AttentionHypePanelProps> = ({ eventId }) => {
   const [context, setContext] = useState<AttentionContext | null>(null);
+  const [health, setHealth] = useState<AttentionCollectorHealth | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
     setIsLoading(true);
-    attentionContextService
-      .getEventContext(eventId)
-      .then((row) => {
-        if (mounted) setContext(row);
+    Promise.all([
+      attentionContextService.getEventContext(eventId),
+      attentionContextService.getCollectorHealth()
+    ])
+      .then(([row, collectorHealth]) => {
+        if (mounted) {
+          setContext(row);
+          setHealth(collectorHealth);
+        }
       })
       .finally(() => {
         if (mounted) setIsLoading(false);
@@ -95,7 +102,7 @@ export const AttentionHypePanel: React.FC<AttentionHypePanelProps> = ({ eventId 
       <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 sm:p-5 shadow-xs">
         <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Zainteresowanie w mediach</h2>
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-          Collector zbiera pierwsze obserwacje. Ta sekcja pojawi się, gdy mamy pierwszy punkt pomiarowy.
+          Collector nie ma jeszcze próbki dla tego meczu.
         </p>
       </section>
     );
@@ -107,6 +114,7 @@ export const AttentionHypePanel: React.FC<AttentionHypePanelProps> = ({ eventId 
     context.attentionStatus === 'falling' ||
     context.attentionStatus === 'stable' ||
     context.attentionStatus === 'no_signal';
+  const collectorDegraded = health?.healthStatus === 'degraded' || health?.healthStatus === 'no_samples';
 
   return (
     <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 sm:p-5 shadow-xs">
@@ -122,6 +130,19 @@ export const AttentionHypePanel: React.FC<AttentionHypePanelProps> = ({ eventId 
         </span>
       </div>
 
+      {collectorDegraded && (
+        <div className="mb-4 rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/50 dark:bg-red-950/10 px-3.5 py-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-red-700 dark:text-red-300">
+            <AlertTriangle className="w-4 h-4" />Collector jest opóźniony
+          </div>
+          <p className="mt-1 text-[11px] text-red-700/80 dark:text-red-300/80">
+            {health?.ageMinutes !== undefined
+              ? `Ostatnia próbka ma około ${Math.round(health.ageMinutes)} min. Oczekiwany interwał to ${health.expectedIntervalMinutes} min; po ${health.degradedAfterMinutes} min oznaczamy automat jako zdegradowany.`
+              : 'Nie mamy aktualnej próbki. Nie interpretujemy tego jako braku zainteresowania.'}
+          </p>
+        </div>
+      )}
+
       <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
         <div className="flex items-center gap-2 text-[11px] font-medium text-zinc-500">
           {status.icon}Aktualny obraz
@@ -129,7 +150,7 @@ export const AttentionHypePanel: React.FC<AttentionHypePanelProps> = ({ eventId 
         <p className="mt-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">{status.headline}</p>
         <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">{status.description}</p>
 
-        {hasComparableWindows && (
+        {hasComparableWindows && !collectorDegraded && (
           <div className="mt-4 grid grid-cols-2 gap-3 max-w-md">
             <div className="rounded-md bg-zinc-50 dark:bg-zinc-950 px-3 py-2">
               <p className="text-[10px] text-zinc-400">Ostatnie 24h</p>
