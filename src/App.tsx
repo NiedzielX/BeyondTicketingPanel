@@ -16,6 +16,7 @@ import { SportingContextPanel } from './components/research/SportingContextPanel
 import { AttentionHypePanel } from './components/research/AttentionHypePanel';
 import { ContextMatrixPanel } from './components/research/ContextMatrixPanel';
 import { SportingShadowValidationPanel } from './components/research/SportingShadowValidationPanel';
+import { MatchContextResearchPanel } from './components/research/MatchContextResearchPanel';
 import { eventsService } from './services/eventsService';
 
 export default function App() {
@@ -151,6 +152,7 @@ export default function App() {
                   </div>
                   <ContextMatrixPanel />
                   <SportingShadowValidationPanel />
+                  <MatchContextResearchPanel />
                   <ResearchReadinessPanel />
                   <WeatherResearchPanel />
                 </div>
