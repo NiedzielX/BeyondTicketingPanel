@@ -13,6 +13,7 @@ import { ResearchReadinessPanel } from './components/research/ResearchReadinessP
 import { WeatherResearchPanel } from './components/research/WeatherResearchPanel';
 import { DemandSignalsPanel } from './components/research/DemandSignalsPanel';
 import { SportingContextPanel } from './components/research/SportingContextPanel';
+import { AttentionHypePanel } from './components/research/AttentionHypePanel';
 import { eventsService } from './services/eventsService';
 
 export default function App() {
@@ -99,6 +100,7 @@ export default function App() {
             <div className="space-y-6">
               <EventDetailPage eventId={selectedEventId} onBack={handleBackToEvents} />
               <SportingContextPanel eventId={selectedEventId} />
+              <AttentionHypePanel eventId={selectedEventId} />
               <DemandSignalsPanel eventId={selectedEventId} />
             </div>
           ) : (
