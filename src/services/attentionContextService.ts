@@ -3,6 +3,7 @@ import { fetchRows } from './supabaseRest';
 export type AttentionStatus =
   | 'collecting_baseline'
   | 'collecting_comparison'
+  | 'no_signal'
   | 'rising'
   | 'falling'
   | 'stable';
