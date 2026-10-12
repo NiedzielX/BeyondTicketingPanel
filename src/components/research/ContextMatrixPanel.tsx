@@ -37,6 +37,8 @@ const readinessLabel = (status?: ContextCollectionStatus): string => {
       return 'Automatycznie';
     case 'active_manual':
       return 'Manual research';
+    case 'verified_registry':
+      return 'Weryfikacja + automat';
     case 'shadow_automated':
       return 'Automatycznie · shadow';
     case 'blocked_external_access':
@@ -54,6 +56,8 @@ const readinessClass = (status?: ContextCollectionStatus): string => {
       return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300';
     case 'active_manual':
       return 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/20 dark:text-blue-300';
+    case 'verified_registry':
+      return 'border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-900/60 dark:bg-cyan-950/20 dark:text-cyan-300';
     case 'shadow_automated':
       return 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900/60 dark:bg-violet-950/20 dark:text-violet-300';
     case 'blocked_external_access':
@@ -102,6 +106,7 @@ export const ContextMatrixPanel: React.FC = () => {
   const readinessSummary = useMemo(
     () => ({
       automated: items.filter((item) => item.collectionStatus === 'active_automated').length,
+      registry: items.filter((item) => item.collectionStatus === 'verified_registry').length,
       manual: items.filter((item) => item.collectionStatus === 'active_manual').length,
       shadow: items.filter((item) => item.collectionStatus === 'shadow_automated').length,
       planned: items.filter((item) => item.collectionStatus === 'planned').length,
@@ -147,6 +152,7 @@ export const ContextMatrixPanel: React.FC = () => {
 
       <div className="flex flex-wrap gap-2 mb-5 text-[10px]">
         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300">{readinessSummary.automated} automatycznych</span>
+        <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 font-medium text-cyan-700 dark:border-cyan-900/60 dark:bg-cyan-950/20 dark:text-cyan-300">{readinessSummary.registry} weryfikacja + automat</span>
         <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/20 dark:text-blue-300">{readinessSummary.manual} manual research</span>
         <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 font-medium text-violet-700 dark:border-violet-900/60 dark:bg-violet-950/20 dark:text-violet-300">{readinessSummary.shadow} shadow</span>
         <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 font-medium text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{readinessSummary.planned} planowane</span>
