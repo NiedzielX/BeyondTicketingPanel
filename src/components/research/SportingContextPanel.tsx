@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, ShieldAlert, Trophy } from 'lucide-react';
+import { Activity, ShieldAlert, Star, Trophy } from 'lucide-react';
 import {
   SportingContextItem,
   sportingContextService
@@ -43,6 +43,7 @@ export const SportingContextPanel: React.FC<SportingContextPanelProps> = ({ even
   const form = useMemo(() => byKey(items, 'sport.form5'), [items]);
   const stakes = useMemo(() => byKey(items, 'sport.match_stakes'), [items]);
   const absence = useMemo(() => byKey(items, 'sport.absence_impact'), [items]);
+  const rivalry = useMemo(() => byKey(items, 'sport.rivalry_opponent'), [items]);
 
   if (isLoading) {
     return (
@@ -56,7 +57,7 @@ export const SportingContextPanel: React.FC<SportingContextPanelProps> = ({ even
     return (
       <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
         <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Kontekst sportowy</h2>
-        <p className="mt-1 text-xs text-zinc-500">Dla tego meczu zbieramy jeszcze formę, stawkę i informacje o absencjach.</p>
+        <p className="mt-1 text-xs text-zinc-500">Dla tego meczu zbieramy jeszcze formę, stawkę, profil rywala i informacje o absencjach.</p>
       </div>
     );
   }
@@ -75,7 +76,7 @@ export const SportingContextPanel: React.FC<SportingContextPanelProps> = ({ even
         </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
         <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
           <div className="flex items-center gap-2 text-[11px] font-medium text-zinc-500">
             <Activity className="w-3.5 h-3.5 text-indigo-600" />Forma ostatnich meczów
@@ -98,6 +99,18 @@ export const SportingContextPanel: React.FC<SportingContextPanelProps> = ({ even
           </div>
           <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
             {stakes?.textValue ?? 'Brak wystarczających danych do oceny stawki.'}
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+          <div className="flex items-center gap-2 text-[11px] font-medium text-zinc-500">
+            <Star className="w-3.5 h-3.5 text-indigo-600" />Rywal / derby
+          </div>
+          <p className="mt-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            {rivalry ? 'Podwyższony profil meczu' : 'Brak specjalnego sygnału'}
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+            {rivalry?.textValue ?? 'Nie mamy jeszcze potwierdzonego sygnału derbowego lub ponadprzeciętnej atrakcyjności rywala.'}
           </p>
         </div>
 
