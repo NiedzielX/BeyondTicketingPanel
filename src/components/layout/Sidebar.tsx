@@ -16,6 +16,7 @@ export type NavItemKey =
   | 'events'
   | 'sales-analytics'
   | 'forecast-accuracy'
+  | 'model-lab'
   | 'data-quality'
   | 'settings';
 
@@ -49,6 +50,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const operationsNavItems = [
     {
+      key: 'model-lab' as NavItemKey,
+      label: 'Model Lab',
+      icon: Sparkles,
+      badge: undefined
+    },
+    {
       key: 'data-quality' as NavItemKey,
       label: 'Jakość danych',
       icon: ShieldAlert,
@@ -58,7 +65,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      {/* Mobile Backdrop */}
       {isOpenMobile && (
         <div
           className="fixed inset-0 z-40 bg-zinc-900/60 backdrop-blur-xs md:hidden"
@@ -66,13 +72,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-      {/* Sidebar Container */}
       <aside
         className={`fixed md:sticky top-0 left-0 z-50 flex h-screen w-64 flex-col border-r border-zinc-200 dark:border-zinc-800 bg-zinc-900 text-zinc-300 transition-transform duration-200 ease-in-out md:translate-x-0 ${
           isOpenMobile ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Brand Header */}
         <div className="flex h-14 items-center justify-between px-5 border-b border-zinc-800">
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-md bg-white text-zinc-950 font-bold text-xs tracking-wider shadow-xs">
@@ -97,7 +101,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Club Profile Switcher / Banner */}
         <div className="px-3 pt-3.5 pb-1">
           <div className="rounded-lg bg-zinc-800/80 p-2.5 border border-zinc-700/60">
             <div className="flex items-center justify-between text-[10px] font-semibold tracking-wider text-zinc-400 uppercase mb-1">
@@ -138,9 +141,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Navigation Sections */}
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
-          {/* KLUB */}
           <div>
             <div className="px-2 pb-1.5 text-[10px] font-bold tracking-wider text-zinc-400 uppercase">
               Klub
@@ -176,7 +177,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </nav>
           </div>
 
-          {/* BEYOND OPERATIONS */}
           <div>
             <div className="px-2 pb-1.5 text-[10px] font-bold tracking-wider text-zinc-400 uppercase">
               Beyond Operations
@@ -218,9 +218,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Footer / Bottom Actions */}
         <div className="p-3 border-t border-zinc-800 space-y-2">
-          {/* Settings button */}
           <button
             onClick={() => {
               onSelectTab('settings');
