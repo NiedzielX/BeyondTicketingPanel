@@ -77,7 +77,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center gap-3">
         <div className="hidden sm:flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
           <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
-          <span>Dane biletowe zaktualizowane 12 minut temu</span>
+          <span>Live data connection</span>
         </div>
 
         {onRefresh && (
