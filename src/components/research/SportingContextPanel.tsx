@@ -84,7 +84,7 @@ export const SportingContextPanel: React.FC<SportingContextPanelProps> = ({ even
           <p className="mt-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
             {form?.textValue ?? 'Brak wystarczających danych'}
           </p>
-          <p className="mt-1 text-[11px] text-zinc-500">Porównujemy ostatnie 5 wyników obu drużyn.</p>
+          <p className="mt-1 text-[11px] text-zinc-500">Porównujemy ostatnie 5 istotnych meczów obu drużyn, także z innych rozgrywek.</p>
         </div>
 
         <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
@@ -107,10 +107,10 @@ export const SportingContextPanel: React.FC<SportingContextPanelProps> = ({ even
             <Star className="w-3.5 h-3.5 text-indigo-600" />Rywal / derby
           </div>
           <p className="mt-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            {rivalry ? 'Podwyższony profil meczu' : 'Brak specjalnego sygnału'}
+            {rivalry ? 'Potwierdzona rywalizacja' : 'Brak potwierdzonego wpisu'}
           </p>
           <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
-            {rivalry?.textValue ?? 'Nie mamy jeszcze potwierdzonego sygnału derbowego lub ponadprzeciętnej atrakcyjności rywala.'}
+            {rivalry?.textValue ?? 'Nie mamy jeszcze zweryfikowanego wpisu o derby lub szczególnej rywalizacji. To nie oznacza, że taka relacja nie istnieje.'}
           </p>
         </div>
 
@@ -119,10 +119,10 @@ export const SportingContextPanel: React.FC<SportingContextPanelProps> = ({ even
             <ShieldAlert className="w-3.5 h-3.5 text-indigo-600" />Absencje
           </div>
           <p className="mt-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            {absence ? 'Mamy potwierdzone informacje' : 'Brak potwierdzonego sygnału'}
+            {absence ? 'Mamy potwierdzoną absencję' : 'Brak wpisu w zweryfikowanym rejestrze'}
           </p>
           <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
-            {absence?.textValue ?? 'Nie mamy obecnie wiarygodnej informacji o absencji, która mogłaby zmienić zainteresowanie meczem.'}
+            {absence?.textValue ?? 'Nie mamy obecnie zweryfikowanego wpisu o absencji. To nie jest potwierdzenie, że obie drużyny zagrają w pełnych składach.'}
           </p>
           {absence && absence.numericValue === undefined && (
             <p className="mt-2 text-[10px] font-medium text-amber-700 dark:text-amber-300">
