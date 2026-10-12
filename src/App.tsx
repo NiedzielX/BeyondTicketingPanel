@@ -8,6 +8,7 @@ import { SalesAnalyticsPage } from './pages/SalesAnalyticsPage';
 import { ForecastAccuracyPage } from './pages/ForecastAccuracyPage';
 import { DataQualityPage } from './pages/DataQualityPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ForecastAccuracyGuide } from './components/common/ForecastAccuracyGuide';
 import { ResearchReadinessPanel } from './components/research/ResearchReadinessPanel';
 import { WeatherResearchPanel } from './components/research/WeatherResearchPanel';
 import { DemandSignalsPanel } from './components/research/DemandSignalsPanel';
@@ -21,7 +22,6 @@ export default function App() {
   const [dataIssuesCount, setDataIssuesCount] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
-
   const [selectedClubContext, setSelectedClubContext] = useState<string>('Lech Poznań');
   const [clubsList, setClubsList] = useState<string[]>([]);
 
@@ -40,9 +40,7 @@ export default function App() {
   const handleSelectEvent = async (eventId: string) => {
     setSelectedEventId(eventId);
     const eventDetail = await eventsService.getEventById(eventId);
-    if (eventDetail) {
-      setSelectedEventName(eventDetail.event.name);
-    }
+    if (eventDetail) setSelectedEventName(eventDetail.event.name);
   };
 
   const handleBackToEvents = () => {
@@ -95,10 +93,7 @@ export default function App() {
           isRefreshing={isRefreshing}
         />
 
-        <main
-          key={refreshVersion}
-          className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto"
-        >
+        <main key={refreshVersion} className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto">
           {selectedEventId ? (
             <div className="space-y-6">
               <EventDetailPage eventId={selectedEventId} onBack={handleBackToEvents} />
@@ -131,10 +126,13 @@ export default function App() {
               )}
 
               {currentTab === 'forecast-accuracy' && (
-                <ForecastAccuracyPage
-                  selectedClubFilter={selectedClubContext}
-                  onClubFilterChange={setSelectedClubContext}
-                />
+                <div className="space-y-6">
+                  <ForecastAccuracyGuide />
+                  <ForecastAccuracyPage
+                    selectedClubFilter={selectedClubContext}
+                    onClubFilterChange={setSelectedClubContext}
+                  />
+                </div>
               )}
 
               {currentTab === 'model-lab' && (
@@ -142,7 +140,7 @@ export default function App() {
                   <div className="border-b border-zinc-200 dark:border-zinc-800 pb-4">
                     <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Model Lab</h1>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                      Wewnętrzny evidence layer Beyond: readiness, eksperymenty i sygnały badawcze. Nic z tej sekcji nie jest automatycznie promowane do produkcyjnego forecastu.
+                      Zaplecze badawcze Beyond. Tutaj sprawdzamy, czy mamy dość danych i czy nowe sygnały naprawdę poprawiają prognozę. Nic z tej sekcji nie trafia automatycznie do głównego modelu.
                     </p>
                   </div>
                   <ResearchReadinessPanel />
@@ -150,10 +148,7 @@ export default function App() {
                 </div>
               )}
 
-              {currentTab === 'data-quality' && (
-                <DataQualityPage onSelectEvent={handleSelectEvent} />
-              )}
-
+              {currentTab === 'data-quality' && <DataQualityPage onSelectEvent={handleSelectEvent} />}
               {currentTab === 'settings' && <SettingsPage />}
             </>
           )}
