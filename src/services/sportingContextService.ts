@@ -1,6 +1,10 @@
 import { fetchRows } from './supabaseRest';
 
-export type SportingContextFeature = 'sport.form5' | 'sport.match_stakes' | 'sport.absence_impact';
+export type SportingContextFeature =
+  | 'sport.form5'
+  | 'sport.match_stakes'
+  | 'sport.absence_impact'
+  | 'sport.rivalry_opponent';
 
 export interface SportingContextItem {
   ticketEventId: number;
