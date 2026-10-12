@@ -9,6 +9,7 @@ export type ContextProductionRole =
 export type ContextCollectionStatus =
   | 'active_automated'
   | 'active_manual'
+  | 'verified_registry'
   | 'shadow_automated'
   | 'planned'
   | 'blocked_external_access';
