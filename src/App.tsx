@@ -21,6 +21,7 @@ import { ContextEvaluationPanel } from './components/research/ContextEvaluationP
 import { CrossClubBaselinePanel } from './components/research/CrossClubBaselinePanel';
 import { TicketingChallengerPanel } from './components/research/TicketingChallengerPanel';
 import { SportingChallengerPanel } from './components/research/SportingChallengerPanel';
+import { MatchContextChallengerPanel } from './components/research/MatchContextChallengerPanel';
 import { eventsService } from './services/eventsService';
 
 export default function App() {
@@ -158,6 +159,7 @@ export default function App() {
                   <CrossClubBaselinePanel />
                   <TicketingChallengerPanel />
                   <SportingChallengerPanel />
+                  <MatchContextChallengerPanel />
                   <ContextEvaluationPanel />
                   <SportingShadowValidationPanel />
                   <MatchContextResearchPanel />
