@@ -19,6 +19,7 @@ import { SportingShadowValidationPanel } from './components/research/SportingSha
 import { MatchContextResearchPanel } from './components/research/MatchContextResearchPanel';
 import { ContextEvaluationPanel } from './components/research/ContextEvaluationPanel';
 import { CrossClubBaselinePanel } from './components/research/CrossClubBaselinePanel';
+import { TicketingChallengerPanel } from './components/research/TicketingChallengerPanel';
 import { eventsService } from './services/eventsService';
 
 export default function App() {
@@ -154,6 +155,7 @@ export default function App() {
                   </div>
                   <ContextMatrixPanel />
                   <CrossClubBaselinePanel />
+                  <TicketingChallengerPanel />
                   <ContextEvaluationPanel />
                   <SportingShadowValidationPanel />
                   <MatchContextResearchPanel />
