@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BadgeEuro, Beaker, CircleDollarSign, FlaskConical, Gauge, ShieldCheck } from 'lucide-react';
+import { BadgeEuro, Beaker, CircleDollarSign, FlaskConical, ShieldCheck } from 'lucide-react';
 import { GrowthExperimentMeasurement, growthExperimentService } from '../services/growthExperimentService';
 
 interface Props {
