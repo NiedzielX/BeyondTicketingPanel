@@ -17,6 +17,7 @@ import { AttentionHypePanel } from './components/research/AttentionHypePanel';
 import { ContextMatrixPanel } from './components/research/ContextMatrixPanel';
 import { ModelEvidenceScorecardPanel } from './components/research/ModelEvidenceScorecardPanel';
 import { ModelPromotionGovernancePanel } from './components/research/ModelPromotionGovernancePanel';
+import { ModelActivationContractPanel } from './components/research/ModelActivationContractPanel';
 import { SportingShadowValidationPanel } from './components/research/SportingShadowValidationPanel';
 import { MatchContextResearchPanel } from './components/research/MatchContextResearchPanel';
 import { ContextEvaluationPanel } from './components/research/ContextEvaluationPanel';
@@ -161,6 +162,7 @@ export default function App() {
                   <ContextMatrixPanel />
                   <ModelEvidenceScorecardPanel />
                   <ModelPromotionGovernancePanel />
+                  <ModelActivationContractPanel />
                   <CrossClubBaselinePanel />
                   <TicketingChallengerPanel />
                   <SportingChallengerPanel />
