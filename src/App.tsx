@@ -26,6 +26,7 @@ import { TicketingChallengerPanel } from './components/research/TicketingChallen
 import { SportingChallengerPanel } from './components/research/SportingChallengerPanel';
 import { MatchContextChallengerPanel } from './components/research/MatchContextChallengerPanel';
 import { HypeChallengerPanel } from './components/research/HypeChallengerPanel';
+import { GrowthOpportunityPanel } from './components/growth/GrowthOpportunityPanel';
 import { eventsService } from './services/eventsService';
 
 export default function App() {
@@ -111,6 +112,7 @@ export default function App() {
           {selectedEventId ? (
             <div className="space-y-6">
               <EventDetailPage eventId={selectedEventId} onBack={handleBackToEvents} />
+              <GrowthOpportunityPanel eventId={selectedEventId} />
               <SportingContextPanel eventId={selectedEventId} />
               <AttentionHypePanel eventId={selectedEventId} />
               <DemandSignalsPanel eventId={selectedEventId} />
