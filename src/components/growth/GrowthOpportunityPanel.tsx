@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, BadgeEuro, Beaker, Gauge, Megaphone, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, BadgeEuro, Beaker, CheckCircle2, Gauge, Megaphone, ShieldAlert } from 'lucide-react';
 import { GrowthOpportunity, growthOpportunityService } from '../../services/growthOpportunityService';
 
 interface Props {
@@ -101,12 +101,20 @@ export const GrowthOpportunityPanel: React.FC<Props> = ({ eventId }) => {
         ))}
       </div>
 
-      <div className="rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/10 p-3.5">
+      <div className={`rounded-lg border p-3.5 ${opportunity.executionSourceConnected ? 'border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/10' : 'border-amber-200 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/10'}`}>
         <div className="flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 mt-0.5 text-amber-600 shrink-0" />
+          {opportunity.executionSourceConnected
+            ? <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-600 shrink-0" />
+            : <AlertTriangle className="w-4 h-4 mt-0.5 text-amber-600 shrink-0" />}
           <div>
-            <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-300">Revenue measurement jeszcze nie jest podłączony</p>
-            <p className="mt-1 text-[10px] leading-relaxed text-amber-700/80 dark:text-amber-300/80">{opportunity.dataCaveat}</p>
+            <p className={`text-[11px] font-semibold ${opportunity.executionSourceConnected ? 'text-emerald-800 dark:text-emerald-300' : 'text-amber-800 dark:text-amber-300'}`}>
+              {opportunity.executionSourceConnected
+                ? `Execution source podłączony${opportunity.executionSourceName ? ` · ${opportunity.executionSourceName}` : ''}`
+                : 'Measurement gotowy · execution source jeszcze niepodłączony'}
+            </p>
+            <p className={`mt-1 text-[10px] leading-relaxed ${opportunity.executionSourceConnected ? 'text-emerald-700/80 dark:text-emerald-300/80' : 'text-amber-700/80 dark:text-amber-300/80'}`}>
+              {opportunity.dataCaveat}
+            </p>
           </div>
         </div>
       </div>
