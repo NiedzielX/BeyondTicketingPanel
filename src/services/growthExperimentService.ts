@@ -123,7 +123,7 @@ class GrowthExperimentService {
   async getForEvent(eventId: string): Promise<GrowthExperimentMeasurement[]> {
     const rows = await fetchRows<ApiRow>('dashboard_growth_experiment_measurement_v1', {
       select: SELECT,
-      ticket_event_id: `eq.${eventId}`,
+      filters: { ticket_event_id: `eq.${eventId}` },
       order: 'experiment_id.desc'
     });
     return rows.map(mapRow);
