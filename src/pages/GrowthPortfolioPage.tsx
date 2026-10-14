@@ -27,10 +27,21 @@ const statusLabel: Record<string, string> = {
 };
 
 const measurementLabel: Record<string, string> = {
-  awaiting_data: 'Czekamy na dane',
+  draft_not_started: 'Draft · bez execution',
+  awaiting_assignment: 'Czekamy na assignment',
+  assignment_mismatch: 'Błąd assignmentu',
+  awaiting_outcome_data: 'Czekamy na outcome',
   collecting_sample: 'Zbieramy próbę',
   descriptive_only: 'Opisowo',
   experiment_observed: 'Wynik dostępny'
+};
+
+const assignmentLabel: Record<string, string> = {
+  not_received: 'Niepodłączony',
+  aggregate_only: 'Aggregate only',
+  manifest_received: 'Manifest',
+  manifest_complete: 'Exact manifest',
+  manifest_mismatch: 'Błąd manifestu'
 };
 
 export const GrowthPortfolioPage: React.FC<Props> = ({ selectedClubFilter }) => {
@@ -51,8 +62,8 @@ export const GrowthPortfolioPage: React.FC<Props> = ({ selectedClubFilter }) => 
     [rows, selectedClubFilter]
   );
 
-  const measured = filtered.filter((row) => row.incrementalGrossRevenue !== undefined);
-  const running = filtered.filter((row) => row.status === 'running').length;
+  const measured = filtered.filter((row) => row.measurementStatus === 'experiment_observed' || row.measurementStatus === 'descriptive_only');
+  const connected = filtered.filter((row) => row.latestBatchSource !== undefined).length;
   const drafts = filtered.filter((row) => row.status === 'draft').length;
   const completed = filtered.filter((row) => row.status === 'completed').length;
   const totalIncrementalTickets = measured.reduce((sum, row) => sum + (row.incrementalTickets ?? 0), 0);
@@ -71,7 +82,7 @@ export const GrowthPortfolioPage: React.FC<Props> = ({ selectedClubFilter }) => 
           <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Growth</h1>
         </div>
         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 max-w-3xl">
-          Rekomendacja → eksperyment → treatment/holdout → incremental tickets → incremental revenue. Beyond mierzy efekt dopiero wtedy, gdy istnieją dane obu ramion; brak danych nie jest zerowym wynikiem.
+          Rekomendacja → assignment Treatment/Holdout → execution → outcome → incremental tickets → incremental revenue. Pomiar v2 używa intent-to-treat: porównujemy całe przypisane ramiona, nie tylko osoby, które faktycznie zobaczyły kampanię.
         </p>
       </div>
 
@@ -85,8 +96,8 @@ export const GrowthPortfolioPage: React.FC<Props> = ({ selectedClubFilter }) => 
           <p className="mt-1 text-2xl font-bold tabular-nums">{drafts}</p>
         </div>
         <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
-          <p className="text-[10px] uppercase tracking-wide text-zinc-400">Running</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-indigo-600">{running}</p>
+          <p className="text-[10px] uppercase tracking-wide text-zinc-400">Execution source</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-indigo-600">{connected}</p>
         </div>
         <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/30 dark:bg-emerald-950/10 p-4">
           <p className="text-[10px] uppercase tracking-wide text-emerald-600">Incremental tickets</p>
@@ -117,29 +128,34 @@ export const GrowthPortfolioPage: React.FC<Props> = ({ selectedClubFilter }) => 
                   <th className="px-4 py-3 text-left">Mecz</th>
                   <th className="px-4 py-3 text-left">Play</th>
                   <th className="px-4 py-3 text-left">Status</th>
-                  <th className="px-4 py-3 text-left">Design</th>
+                  <th className="px-4 py-3 text-left">Assignment</th>
                   <th className="px-4 py-3 text-left">Measurement</th>
+                  <th className="px-4 py-3 text-left">Source</th>
                   <th className="px-4 py-3 text-right">Incremental tickets</th>
                   <th className="px-4 py-3 text-right">Contribution</th>
                   <th className="px-4 py-3 text-right">ROI</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                {filtered.map((row) => (
-                  <tr key={row.experimentId} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30">
-                    <td className="px-4 py-3 min-w-[220px]">
-                      <p className="font-semibold text-zinc-900 dark:text-zinc-100">{row.homeTeam} – {row.awayTeam}</p>
-                      <p className="mt-0.5 text-[10px] text-zinc-400">{new Intl.DateTimeFormat('pl-PL', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(row.kickoffAt))}</p>
-                    </td>
-                    <td className="px-4 py-3">{playLabel[row.play] ?? row.play}</td>
-                    <td className="px-4 py-3"><span className="rounded-full border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 text-[10px] font-semibold">{statusLabel[row.status] ?? row.status}</span></td>
-                    <td className="px-4 py-3">{row.evidenceDesign.replaceAll('_', ' ')}</td>
-                    <td className="px-4 py-3">{measurementLabel[row.measurementStatus] ?? row.measurementStatus}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{fmt(row.incrementalTickets, 1)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{money(row.incrementalContribution, row.currency)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{row.roi === undefined ? '—' : `${fmt(row.roi, 2)}×`}</td>
-                  </tr>
-                ))}
+                {filtered.map((row) => {
+                  const reportable = row.measurementStatus === 'experiment_observed' || row.measurementStatus === 'descriptive_only';
+                  return (
+                    <tr key={row.experimentId} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30">
+                      <td className="px-4 py-3 min-w-[220px]">
+                        <p className="font-semibold text-zinc-900 dark:text-zinc-100">{row.homeTeam} – {row.awayTeam}</p>
+                        <p className="mt-0.5 text-[10px] text-zinc-400">{new Intl.DateTimeFormat('pl-PL', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(row.kickoffAt))}</p>
+                      </td>
+                      <td className="px-4 py-3">{playLabel[row.play] ?? row.play}</td>
+                      <td className="px-4 py-3"><span className="rounded-full border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 text-[10px] font-semibold">{statusLabel[row.status] ?? row.status}</span></td>
+                      <td className="px-4 py-3">{assignmentLabel[row.assignmentStatus] ?? row.assignmentStatus}</td>
+                      <td className="px-4 py-3">{measurementLabel[row.measurementStatus] ?? row.measurementStatus}</td>
+                      <td className="px-4 py-3">{row.latestBatchSource ?? '—'}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{reportable ? fmt(row.incrementalTickets, 1) : '—'}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{reportable ? money(row.incrementalContribution, row.currency) : '—'}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{reportable && row.roi !== undefined ? `${fmt(row.roi, 2)}×` : '—'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -148,22 +164,22 @@ export const GrowthPortfolioPage: React.FC<Props> = ({ selectedClubFilter }) => 
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
-          <div className="flex items-center gap-1.5 text-xs font-semibold"><FlaskConical className="w-4 h-4 text-indigo-600" />1. Experiment</div>
-          <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">Treatment i holdout są zapisane przed startem. W v1 preferujemy randomized holdout; manual comparison jest oznaczany jako non-causal.</p>
+          <div className="flex items-center gap-1.5 text-xs font-semibold"><FlaskConical className="w-4 h-4 text-indigo-600" />1. Assignment</div>
+          <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">Preferred: randomized holdout + exact pseudonymous manifest. Jeśli źródło może przekazać tylko liczebności, używamy aggregate-only i oznaczamy niższą audytowalność.</p>
         </div>
         <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
-          <div className="flex items-center gap-1.5 text-xs font-semibold"><ShieldCheck className="w-4 h-4 text-emerald-600" />2. Measurement</div>
-          <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">Gate 100 exposed / arm jest minimum operacyjnym. Nie udajemy, że sam ten próg oznacza statistical significance.</p>
+          <div className="flex items-center gap-1.5 text-xs font-semibold"><ShieldCheck className="w-4 h-4 text-emerald-600" />2. Intent-to-treat</div>
+          <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">Assigned jest denominator-em efektu. Exposed mierzy wykonanie kampanii, ale nie decyduje, kto zostaje w Treatment/Holdout po randomizacji.</p>
         </div>
         <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
           <div className="flex items-center gap-1.5 text-xs font-semibold"><CircleDollarSign className="w-4 h-4 text-emerald-600" />3. Business result</div>
-          <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">Incremental contribution = uplift w net ticket revenue minus incremental campaign cost. ROI pojawia się tylko przy dodatnim koszcie incremental.</p>
+          <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">Incremental contribution = uplift w net ticket revenue minus incremental campaign cost. ROI jest raportowany dopiero, gdy wynik przeszedł gate execution data.</p>
         </div>
       </div>
 
       {completed === 0 && (
         <div className="rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/10 p-3.5 text-[11px] text-amber-800 dark:text-amber-300">
-          Nie ma jeszcze zakończonego eksperymentu z realnym wynikiem. To poprawny stan POC — pierwsze liczby pojawią się dopiero po dostarczeniu treatment/holdout outcome data.
+          Nie ma jeszcze zakończonego eksperymentu z realnym wynikiem. To poprawny stan POC — pierwsze liczby pojawią się dopiero po assignment + treatment/holdout outcome data z systemu wykonawczego.
         </div>
       )}
     </div>
