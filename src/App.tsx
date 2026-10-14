@@ -5,6 +5,7 @@ import { OverviewPage } from './pages/OverviewPage';
 import { EventsListPage } from './pages/EventsListPage';
 import { EventDetailPage } from './pages/EventDetailPage';
 import { SalesAnalyticsPage } from './pages/SalesAnalyticsPage';
+import { GrowthPortfolioPage } from './pages/GrowthPortfolioPage';
 import { ForecastAccuracyPage } from './pages/ForecastAccuracyPage';
 import { DataQualityPage } from './pages/DataQualityPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -143,6 +144,10 @@ export default function App() {
                   onSelectEvent={handleSelectEvent}
                   selectedClubFilter={selectedClubContext}
                 />
+              )}
+
+              {currentTab === 'growth' && (
+                <GrowthPortfolioPage selectedClubFilter={selectedClubContext} />
               )}
 
               {currentTab === 'forecast-accuracy' && (
