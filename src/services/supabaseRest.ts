@@ -10,6 +10,7 @@ const PAGE_SIZE = 1000;
 interface FetchRowsOptions {
   select: string;
   order?: string;
+  filters?: Record<string, string>;
   /**
    * Production dashboard reads exclude forecast_status=shadow by default.
    * Model Lab / research views may opt in explicitly when they are introduced.
@@ -28,7 +29,7 @@ interface FetchRowsOptions {
  */
 export async function fetchRows<T>(
   table: string,
-  { select, order, includeShadow = false }: FetchRowsOptions
+  { select, order, filters, includeShadow = false }: FetchRowsOptions
 ): Promise<T[]> {
   const rows: T[] = [];
   let offset = 0;
@@ -36,6 +37,12 @@ export async function fetchRows<T>(
   while (true) {
     const params = new URLSearchParams({ select });
     if (order) params.set('order', order);
+
+    if (filters) {
+      for (const [key, value] of Object.entries(filters)) {
+        params.set(key, value);
+      }
+    }
 
     if (table === 'forecast_observations' && !includeShadow) {
       params.set('or', '(forecast_status.is.null,forecast_status.neq.shadow)');
