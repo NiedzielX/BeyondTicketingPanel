@@ -24,6 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
       case 'overview': return 'Przegląd';
       case 'events': return 'Mecze';
       case 'sales-analytics': return 'Trendy zainteresowania';
+      case 'growth': return 'Growth';
       case 'forecast-accuracy': return 'Jak trafne są prognozy?';
       case 'model-lab': return 'Model Lab';
       case 'data-quality': return 'Jakość danych';
