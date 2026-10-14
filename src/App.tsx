@@ -22,6 +22,7 @@ import { CrossClubBaselinePanel } from './components/research/CrossClubBaselineP
 import { TicketingChallengerPanel } from './components/research/TicketingChallengerPanel';
 import { SportingChallengerPanel } from './components/research/SportingChallengerPanel';
 import { MatchContextChallengerPanel } from './components/research/MatchContextChallengerPanel';
+import { HypeChallengerPanel } from './components/research/HypeChallengerPanel';
 import { eventsService } from './services/eventsService';
 
 export default function App() {
@@ -160,6 +161,7 @@ export default function App() {
                   <TicketingChallengerPanel />
                   <SportingChallengerPanel />
                   <MatchContextChallengerPanel />
+                  <HypeChallengerPanel />
                   <ContextEvaluationPanel />
                   <SportingShadowValidationPanel />
                   <MatchContextResearchPanel />
