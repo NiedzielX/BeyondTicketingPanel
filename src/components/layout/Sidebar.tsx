@@ -8,13 +8,15 @@ import {
   Settings,
   X,
   Sparkles,
-  Building2
+  Building2,
+  BadgeEuro
 } from 'lucide-react';
 
 export type NavItemKey =
   | 'overview'
   | 'events'
   | 'sales-analytics'
+  | 'growth'
   | 'forecast-accuracy'
   | 'model-lab'
   | 'data-quality'
@@ -45,6 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { key: 'overview' as NavItemKey, label: 'Przegląd', icon: LayoutDashboard },
     { key: 'events' as NavItemKey, label: 'Mecze', icon: CalendarDays },
     { key: 'sales-analytics' as NavItemKey, label: 'Trendy zainteresowania', icon: BarChart3 },
+    { key: 'growth' as NavItemKey, label: 'Growth', icon: BadgeEuro },
     { key: 'forecast-accuracy' as NavItemKey, label: 'Jak trafne są prognozy?', icon: LineChart }
   ];
 
