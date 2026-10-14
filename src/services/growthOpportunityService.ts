@@ -1,5 +1,6 @@
 import { EventDetailData } from '../types/ticketing';
 import { eventsService } from './eventsService';
+import { growthExperimentService } from './growthExperimentService';
 import { EventLiveState, researchService } from './researchService';
 
 export type GrowthPlay =
@@ -22,7 +23,9 @@ export interface GrowthOpportunity {
   recommendedAction: string;
   doNotDo: string;
   measurementPlan: string;
-  revenueMeasurementStatus: 'not_connected' | 'experiment_ready';
+  measurementInfrastructureReady: true;
+  executionSourceConnected: boolean;
+  executionSourceName?: string;
   evidence: Array<{ label: string; value: string }>;
   dataCaveat: string;
 }
@@ -115,9 +118,10 @@ function copyFor(play: GrowthPlay, daysToEvent: number) {
 
 class GrowthOpportunityService {
   async getForEvent(eventId: string): Promise<GrowthOpportunity | null> {
-    const [detail, live] = await Promise.all([
+    const [detail, live, experiments] = await Promise.all([
       eventsService.getEventById(eventId),
-      researchService.getEventLiveState(eventId)
+      researchService.getEventLiveState(eventId),
+      growthExperimentService.getForEvent(eventId)
     ]);
     if (!detail) return null;
 
@@ -130,6 +134,7 @@ class GrowthOpportunityService {
       : (live.rawSnapshotCount ?? 0) >= 12
         ? 'high'
         : 'medium';
+    const executionSource = experiments.find((experiment) => experiment.latestBatchSource !== undefined)?.latestBatchSource;
 
     return {
       eventId,
@@ -139,8 +144,10 @@ class GrowthOpportunityService {
       ...copy,
       measurementPlan: play === 'monitor' || play === 'insufficient_data' || play === 'hold_data_quality'
         ? 'Brak eksperymentu do mierzenia. Zapisz decyzję i obserwuj kolejny checkpoint.'
-        : 'Uruchom treatment + holdout. Mierz incremental purchases i gross ticket revenue względem holdoutu; koszt kampanii odejmij dopiero przy liczeniu incremental contribution.',
-      revenueMeasurementStatus: 'not_connected',
+        : 'Uruchom przypisany Treatment + Holdout. Beyond mierzy wynik intent-to-treat: incremental tickets i revenue względem całego przypisanego holdoutu, a koszt kampanii odejmuje przy liczeniu incremental contribution.',
+      measurementInfrastructureReady: true,
+      executionSourceConnected: executionSource !== undefined,
+      executionSourceName: executionSource,
       evidence: [
         { label: 'Do meczu', value: `${Math.max(0, Math.round(detail.event.daysToEvent))} dni` },
         { label: 'Widoczne miejsca', value: fmt(live?.availableTotal, 0) },
@@ -149,7 +156,9 @@ class GrowthOpportunityService {
         { label: 'Velocity 24h', value: fmt(live?.velocity24h, 1) },
         { label: 'Forecast P50', value: detail.event.currentForecast === undefined ? '—' : fmt(detail.event.currentForecast, 0) }
       ],
-      dataCaveat: 'Publiczne inventory jest proxy popytu, nie raportem sprzedanych biletów. Incremental revenue wymaga danych transakcyjnych i przypisania treatment/holdout — obecny POC jeszcze ich nie posiada.'
+      dataCaveat: executionSource
+        ? `Warstwa pomiarowa i execution source (${executionSource}) są podłączone. Wynik biznesowy pojawia się dopiero po poprawnym assignment + outcome data obu ramion i przejściu gate'u pomiarowego.`
+        : 'Warstwa pomiarowa Treatment/Holdout jest gotowa. Brakuje realnego execution source od klubu: assigned, exposed, purchasers, tickets, revenue, refunds i campaign cost. Dopóki te dane nie wpłyną, Beyond nie pokazuje sztucznego +tickets / +PLN / ROI.'
     };
   }
 }
