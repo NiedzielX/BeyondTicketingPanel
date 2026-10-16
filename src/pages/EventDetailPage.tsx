@@ -13,6 +13,7 @@ import { CommercialStatusBadge, SeverityBadge, TrendIndicator } from '../compone
 import { MetricCard } from '../components/common/MetricCard';
 import { SalesForecastChart } from '../components/charts/SalesForecastChart';
 import { ForecastHistoryTable } from '../components/table/ForecastHistoryTable';
+import { SectorPerformancePanel } from '../components/sector/SectorPerformancePanel';
 
 interface EventDetailPageProps {
   eventId: string;
@@ -139,6 +140,8 @@ export const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBac
       <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-3 text-xs text-zinc-600 dark:text-zinc-300">
         <strong>Jak czytać dane o dostępności?</strong> Obserwujemy miejsca widoczne w publicznym systemie biletowym. Ich zmiana jest dla nas sygnałem zainteresowania, ale nie jest bezpośrednią informacją o sprzedaży.
       </div>
+
+      <SectorPerformancePanel eventId={eventId} />
 
       <div>
         <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Szczegóły</h2>
