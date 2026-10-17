@@ -32,6 +32,8 @@ export interface GrowthOpportunity {
   whyNow: string;
   observationPlan: string;
   pilotMeasurementPlan: string;
+  executionSourceConnected: boolean;
+  executionSourceName?: string;
   forecastP50?: number;
   forecastGapToCapacity?: number;
   visibleAvailability?: number;
@@ -177,6 +179,8 @@ function buildOpportunity(event: EnrichedEvent, live: EventLiveState | null): Gr
     ...copy,
     observationPlan: observationPlanFor(play),
     pilotMeasurementPlan: 'Po wejściu klubu w pilot można dołączyć CRM/ticketing i przejść do Treatment/Holdout oraz pomiaru incremental tickets/revenue. Nie jest to wymagane do działania Growth POC.',
+    executionSourceConnected: false,
+    executionSourceName: undefined,
     forecastP50: event.currentForecast,
     forecastGapToCapacity: event.currentForecast === undefined ? undefined : Math.max(0, event.capacity - event.currentForecast),
     visibleAvailability: live?.availableTotal,
