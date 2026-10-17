@@ -88,7 +88,7 @@ export const GrowthOpportunityPanel: React.FC<Props> = ({ eventId }) => {
         </div>
         <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3.5">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100"><Beaker className="w-3.5 h-3.5 text-emerald-600" />Jak mierzymy efekt</div>
-          <p className="mt-2 text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300">{opportunity.measurementPlan}</p>
+          <p className="mt-2 text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300">{opportunity.pilotMeasurementPlan}</p>
         </div>
       </div>
 
