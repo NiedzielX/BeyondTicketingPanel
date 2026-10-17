@@ -11,6 +11,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import {
+  PricingAction,
   SectorDecisionRow,
   SectorStatus,
   SectorSummaryRow,
@@ -57,8 +58,45 @@ const TREND_LABEL: Record<SectorTrend, string> = {
   UNKNOWN: 'Brak danych'
 };
 
+const PRICING_ACTION_META: Record<
+  PricingAction,
+  { label: string; className: string }
+> = {
+  DECREASE: {
+    label: 'Obniż',
+    className:
+      'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300'
+  },
+  HOLD: {
+    label: 'Utrzymaj',
+    className:
+      'border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+  },
+  INCREASE: {
+    label: 'Podnieś',
+    className:
+      'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300'
+  },
+  MONITOR: {
+    label: 'Monitoruj',
+    className:
+      'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300'
+  }
+};
+
 function StatusPill({ status }: { status: SectorStatus }) {
   const meta = STATUS_META[status];
+  return (
+    <span
+      className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold ${meta.className}`}
+    >
+      {meta.label}
+    </span>
+  );
+}
+
+function PricingActionPill({ action }: { action: PricingAction }) {
+  const meta = PRICING_ACTION_META[action];
   return (
     <span
       className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold ${meta.className}`}
@@ -107,6 +145,34 @@ function confidenceLabel(value: SectorDecisionRow['projection_confidence']): str
     default:
       return 'Brak';
   }
+}
+
+function pricingConfidenceLabel(value: SectorDecisionRow['pricing_scenario_confidence']): string {
+  switch (value) {
+    case 'HIGH':
+      return 'wysoka';
+    case 'MEDIUM':
+      return 'średnia';
+    case 'LOW':
+      return 'niska';
+    default:
+      return '—';
+  }
+}
+
+function formatPrice(value: number | null, currency: string | null): string {
+  if (value === null || Number.isNaN(value)) return '—';
+  const formatted = new Intl.NumberFormat('pl-PL', {
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2
+  }).format(value);
+  return `${formatted}${currency ? ` ${currency}` : ''}`;
+}
+
+function formatPriceChange(value: number | null): string {
+  if (value === null || Number.isNaN(value)) return '';
+  const percent = Math.round(value * 100);
+  return `${percent > 0 ? '+' : ''}${percent}%`;
 }
 
 const SUMMARY_CARD =
@@ -182,6 +248,12 @@ export const SectorPerformancePanel: React.FC<SectorPerformancePanelProps> = ({ 
   const projectionCoverage = (summary.projection_coverage_ratio ?? 0) * 100;
   const topGap = summary.top_underperforming_gap_available;
   const topProjected = summary.top_underperforming_projected_available;
+  const pricingActionable = summary.pricing_actionable_count ?? 0;
+  const pricedSectors = summary.priced_sector_count ?? 0;
+  const pricingDecrease = summary.pricing_decrease_count ?? 0;
+  const pricingIncrease = summary.pricing_increase_count ?? 0;
+  const pricingHold = summary.pricing_hold_count ?? 0;
+  const pricingMonitor = summary.pricing_monitor_count ?? 0;
 
   return (
     <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
@@ -262,20 +334,53 @@ export const SectorPerformancePanel: React.FC<SectorPerformancePanelProps> = ({ 
 
         <div className={SUMMARY_CARD}>
           <div className="flex items-center gap-2 text-[11px] font-medium text-zinc-500">
-            <CircleDollarSign className="h-3.5 w-3.5 text-zinc-400" />
+            <CircleDollarSign className="h-3.5 w-3.5 text-indigo-600" />
             Dynamic pricing
           </div>
-          <div className="mt-1 text-base font-semibold text-zinc-900 dark:text-zinc-100">
-            Brak danych cenowych
-          </div>
-          <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
-            Rekomendacja ceny pojawi się po podłączeniu rzeczywistych cen sektorów. Nie estymujemy ich z dostępności.
-          </p>
+          {pricingActionable > 0 ? (
+            <>
+              <div className="mt-1 text-2xl font-bold tabular-nums text-zinc-900 dark:text-zinc-100">
+                {pricingActionable}
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+                scenariuszy do decyzji · obniż {pricingDecrease} · podnieś {pricingIncrease}
+              </p>
+              {summary.top_pricing_sector && summary.top_pricing_action && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-zinc-500">
+                  <span>Priorytet: sektor {summary.top_pricing_sector}</span>
+                  <PricingActionPill action={summary.top_pricing_action} />
+                  {summary.top_pricing_recommended_price !== null && (
+                    <span className="font-semibold text-zinc-700 dark:text-zinc-200">
+                      {formatPrice(summary.top_pricing_recommended_price, sectors.find((row) => row.sector === summary.top_pricing_sector)?.currency ?? null)}
+                    </span>
+                  )}
+                </div>
+              )}
+            </>
+          ) : pricedSectors > 0 ? (
+            <>
+              <div className="mt-1 text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                Ceny podłączone
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+                {pricedSectors} sektorów z ceną · utrzymaj {pricingHold} · monitoruj {pricingMonitor}. Brak materialnej zmiany ceny do rekomendacji.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="mt-1 text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                Brak danych cenowych
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+                Rekomendacja ceny pojawi się po podłączeniu rzeczywistych cen sektorów. Nie estymujemy ich z dostępności.
+              </p>
+            </>
+          )}
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px] text-left text-xs">
+        <table className="w-full min-w-[1080px] text-left text-xs">
           <thead className="border-y border-zinc-200 bg-zinc-50 text-[10px] uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/80">
             <tr>
               <th className="px-4 py-2.5 font-semibold">Sektor</th>
@@ -285,46 +390,81 @@ export const SectorPerformancePanel: React.FC<SectorPerformancePanelProps> = ({ 
               <th className="px-3 py-2.5 font-semibold">Trend</th>
               <th className="px-3 py-2.5 text-right font-semibold">Na kickoff</th>
               <th className="px-3 py-2.5 font-semibold">Pewność</th>
-              <th className="px-4 py-2.5 font-semibold">Cena / akcja</th>
+              <th className="px-4 py-2.5 font-semibold">Cena / rekomendacja</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/70">
-            {visibleSectors.map((row) => (
-              <tr key={`${row.ticket_event_id}-${row.sector}`} className="hover:bg-zinc-50/70 dark:hover:bg-zinc-800/30">
-                <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100">{row.sector}</td>
-                <td className="px-3 py-3 text-right tabular-nums text-zinc-700 dark:text-zinc-300">
-                  {formatNumber(row.current_public_availability)}
-                </td>
-                <td className={`px-3 py-3 text-right font-medium tabular-nums ${
-                  (row.sector_gap_available ?? 0) > 0
-                    ? 'text-rose-600 dark:text-rose-400'
-                    : (row.sector_gap_available ?? 0) < 0
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-zinc-500'
-                }`}>
-                  {signedSeats(row.sector_gap_available)}
-                </td>
-                <td className="px-3 py-3"><StatusPill status={row.sector_status} /></td>
-                <td className="px-3 py-3"><TrendLabel trend={row.trend_state} /></td>
-                <td className="px-3 py-3 text-right tabular-nums text-zinc-700 dark:text-zinc-300">
-                  {row.projected_public_availability_at_kickoff === null
-                    ? '—'
-                    : formatNumber(row.projected_public_availability_at_kickoff)}
-                </td>
-                <td className="px-3 py-3 text-zinc-600 dark:text-zinc-300">
-                  {confidenceLabel(row.projection_confidence)}
-                </td>
-                <td className="px-4 py-3">
-                  {row.price_data_status === 'PRICE_DATA_MISSING' ? (
-                    <span className="text-[11px] text-zinc-400">Brak ceny · rekomendacja oczekuje</span>
-                  ) : (
-                    <span className="font-medium text-zinc-700 dark:text-zinc-200">
-                      {row.current_price !== null ? `${row.current_price} ${row.currency ?? ''}` : '—'}
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {visibleSectors.map((row) => {
+              const action = row.pricing_recommendation_action;
+              const mixedPrices = row.price_data_status === 'MIXED_STANDARD_PRICES_REQUIRES_PRICE_AREA_SPLIT';
+              return (
+                <tr key={`${row.ticket_event_id}-${row.sector}`} className="hover:bg-zinc-50/70 dark:hover:bg-zinc-800/30">
+                  <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100">{row.sector}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-zinc-700 dark:text-zinc-300">
+                    {formatNumber(row.current_public_availability)}
+                  </td>
+                  <td className={`px-3 py-3 text-right font-medium tabular-nums ${
+                    (row.sector_gap_available ?? 0) > 0
+                      ? 'text-rose-600 dark:text-rose-400'
+                      : (row.sector_gap_available ?? 0) < 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-zinc-500'
+                  }`}>
+                    {signedSeats(row.sector_gap_available)}
+                  </td>
+                  <td className="px-3 py-3"><StatusPill status={row.sector_status} /></td>
+                  <td className="px-3 py-3"><TrendLabel trend={row.trend_state} /></td>
+                  <td className="px-3 py-3 text-right tabular-nums text-zinc-700 dark:text-zinc-300">
+                    {row.projected_public_availability_at_kickoff === null
+                      ? '—'
+                      : formatNumber(row.projected_public_availability_at_kickoff)}
+                  </td>
+                  <td className="px-3 py-3 text-zinc-600 dark:text-zinc-300">
+                    {confidenceLabel(row.projection_confidence)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {mixedPrices ? (
+                      <div>
+                        <div className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                          Wiele price areas
+                        </div>
+                        <div className="mt-0.5 text-[10px] text-zinc-400">Wymagany split przed rekomendacją ceny</div>
+                      </div>
+                    ) : row.current_price === null ? (
+                      <span className="text-[11px] text-zinc-400">Brak ceny · rekomendacja oczekuje</span>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-semibold tabular-nums text-zinc-800 dark:text-zinc-100">
+                            {formatPrice(row.current_price, row.currency)}
+                          </span>
+                          {action && <PricingActionPill action={action} />}
+                        </div>
+                        {action && ['DECREASE', 'INCREASE'].includes(action) && row.recommended_price !== null ? (
+                          <div className="text-[11px] text-zinc-600 dark:text-zinc-300">
+                            → <span className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">{formatPrice(row.recommended_price, row.currency)}</span>
+                            {row.recommended_price_change_pct !== null && (
+                              <span className="ml-1 text-zinc-500">({formatPriceChange(row.recommended_price_change_pct)})</span>
+                            )}
+                            <span className="ml-1 text-zinc-400">· pewność {pricingConfidenceLabel(row.pricing_scenario_confidence)}</span>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-zinc-400">
+                            {row.pricing_recommendation_reason_code === 'INSUFFICIENT_PROJECTED_FUTURE_VOLUME'
+                              ? 'Za mały przewidywany wolumen do sensownej zmiany ceny'
+                              : row.pricing_recommendation_reason_code === 'INSUFFICIENT_INCREMENTAL_SCENARIO_EFFECT'
+                                ? 'Scenariusz ceny nie daje materialnego efektu vs HOLD'
+                                : action === 'HOLD'
+                                  ? 'Brak potrzeby zmiany ceny przy obecnym sygnale'
+                                  : 'Obserwuj kolejne odczyty przed zmianą ceny'}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -341,7 +481,7 @@ export const SectorPerformancePanel: React.FC<SectorPerformancePanelProps> = ({ 
       )}
 
       <div className="border-t border-zinc-200 bg-zinc-50/60 px-4 py-3 text-[10px] leading-relaxed text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950/30 sm:px-5">
-        „Gap” oznacza różnicę względem tempa całego eventu. Dodatni gap = więcej publicznie dostępnych miejsc niż oczekiwalibyśmy przy obecnym tempie eventu. Projekcja „na kickoff” jest scenariuszem kontynuacji obecnego trendu, nie prognozą potwierdzonej sprzedaży.
+        „Gap” oznacza różnicę względem tempa całego eventu. Dodatni gap = więcej publicznie dostępnych miejsc niż oczekiwalibyśmy przy obecnym tempie eventu. Projekcja „na kickoff” jest scenariuszem kontynuacji obecnego trendu, nie prognozą potwierdzonej sprzedaży. Dynamic pricing jest obecnie scenariuszem opartym na rzeczywistej cenie i jawnych założeniach elastyczności; wymaga decyzji człowieka i nie zmienia ceny automatycznie.
       </div>
     </section>
   );
