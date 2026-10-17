@@ -11,6 +11,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import {
+  PriceAreaPricingRow,
   PricingAction,
   SectorDecisionRow,
   SectorStatus,
@@ -147,7 +148,7 @@ function confidenceLabel(value: SectorDecisionRow['projection_confidence']): str
   }
 }
 
-function pricingConfidenceLabel(value: SectorDecisionRow['pricing_scenario_confidence']): string {
+function pricingConfidenceLabel(value: 'HIGH' | 'MEDIUM' | 'LOW' | null): string {
   switch (value) {
     case 'HIGH':
       return 'wysoka';
@@ -175,12 +176,34 @@ function formatPriceChange(value: number | null): string {
   return `${percent > 0 ? '+' : ''}${percent}%`;
 }
 
+function priceAreaReason(row: PriceAreaPricingRow): string {
+  switch (row.recommendation_reason_code) {
+    case 'SECTOR_SIGNAL_INSUFFICIENT':
+      return 'Sygnał sektora jest niewystarczający';
+    case 'INSUFFICIENT_PROJECTED_FUTURE_VOLUME':
+      return 'Za mały przewidywany wolumen do zmiany ceny';
+    case 'INSUFFICIENT_INCREMENTAL_SCENARIO_EFFECT':
+      return 'Zmiana ceny nie daje materialnego efektu vs HOLD';
+    case 'OUTPERFORMING_BUT_WEAKENING_HOLD':
+      return 'Popyt nadal mocny, ale trend słabnie — utrzymaj cenę';
+    case 'ON_TRACK_HOLD':
+      return 'Tempo zgodne z oczekiwaniem — utrzymaj cenę';
+    case 'BASE_PRICE_UNRESOLVED':
+      return 'Nie udało się jednoznacznie ustalić ceny bazowej';
+    default:
+      return row.recommended_action === 'MONITOR'
+        ? 'Obserwuj kolejne odczyty przed zmianą ceny'
+        : 'Scenariusz wymaga decyzji człowieka';
+  }
+}
+
 const SUMMARY_CARD =
   'rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900';
 
 export const SectorPerformancePanel: React.FC<SectorPerformancePanelProps> = ({ eventId }) => {
   const [summary, setSummary] = useState<SectorSummaryRow | null>(null);
   const [sectors, setSectors] = useState<SectorDecisionRow[]>([]);
+  const [priceAreas, setPriceAreas] = useState<PriceAreaPricingRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
@@ -196,6 +219,7 @@ export const SectorPerformancePanel: React.FC<SectorPerformancePanelProps> = ({ 
         if (!cancelled) {
           setSummary(result.summary);
           setSectors(result.sectors);
+          setPriceAreas(result.priceAreas);
         }
       } catch (err) {
         if (!cancelled) {
@@ -216,6 +240,16 @@ export const SectorPerformancePanel: React.FC<SectorPerformancePanelProps> = ({ 
     if (showAll) return sectors;
     return sectors.slice(0, 12);
   }, [sectors, showAll]);
+
+  const priceAreasBySector = useMemo(() => {
+    const map = new Map<string, PriceAreaPricingRow[]>();
+    priceAreas.forEach((row) => {
+      const current = map.get(row.sector) ?? [];
+      current.push(row);
+      map.set(row.sector, current);
+    });
+    return map;
+  }, [priceAreas]);
 
   if (isLoading) {
     return (
@@ -299,7 +333,7 @@ export const SectorPerformancePanel: React.FC<SectorPerformancePanelProps> = ({ 
             <>
               <div className="mt-1 flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                  {summary.top_underperforming_sector}
+                  {priceAreasBySector.get(summary.top_underperforming_sector)?.[0]?.sector_name ?? summary.top_underperforming_sector}
                 </span>
                 <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">
                   {signedSeats(topGap)} miejsc
@@ -347,7 +381,7 @@ export const SectorPerformancePanel: React.FC<SectorPerformancePanelProps> = ({ 
               </p>
               {summary.top_pricing_sector && summary.top_pricing_action && (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-zinc-500">
-                  <span>Priorytet: sektor {summary.top_pricing_sector}</span>
+                  <span>Priorytet: sektor {priceAreasBySector.get(summary.top_pricing_sector)?.[0]?.sector_name ?? summary.top_pricing_sector}</span>
                   <PricingActionPill action={summary.top_pricing_action} />
                   {summary.top_pricing_recommended_price !== null && (
                     <span className="font-semibold text-zinc-700 dark:text-zinc-200">
@@ -397,9 +431,12 @@ export const SectorPerformancePanel: React.FC<SectorPerformancePanelProps> = ({ 
             {visibleSectors.map((row) => {
               const action = row.pricing_recommendation_action;
               const mixedPrices = row.price_data_status === 'MIXED_STANDARD_PRICES_REQUIRES_PRICE_AREA_SPLIT';
+              const sectorPriceAreas = priceAreasBySector.get(row.sector) ?? [];
+              const sectorLabel = sectorPriceAreas[0]?.sector_name ?? row.sector;
+
               return (
                 <tr key={`${row.ticket_event_id}-${row.sector}`} className="hover:bg-zinc-50/70 dark:hover:bg-zinc-800/30">
-                  <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100">{row.sector}</td>
+                  <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100">{sectorLabel}</td>
                   <td className="px-3 py-3 text-right tabular-nums text-zinc-700 dark:text-zinc-300">
                     {formatNumber(row.current_public_availability)}
                   </td>
@@ -424,12 +461,46 @@ export const SectorPerformancePanel: React.FC<SectorPerformancePanelProps> = ({ 
                   </td>
                   <td className="px-4 py-3">
                     {mixedPrices ? (
-                      <div>
-                        <div className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
-                          Wiele price areas
+                      sectorPriceAreas.length > 0 ? (
+                        <div className="space-y-2">
+                          {sectorPriceAreas.map((priceArea) => (
+                            <div
+                              key={`${priceArea.sector}-${priceArea.price_area_id}`}
+                              className="rounded-md border border-zinc-200 bg-zinc-50/70 px-2.5 py-2 dark:border-zinc-700 dark:bg-zinc-800/40"
+                            >
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">
+                                  {priceArea.price_area_name ?? `Price area ${priceArea.price_area_id}`}
+                                </span>
+                                <span className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                                  {formatPrice(priceArea.current_price, priceArea.currency)}
+                                </span>
+                                <PricingActionPill action={priceArea.recommended_action} />
+                              </div>
+                              {['DECREASE', 'INCREASE'].includes(priceArea.recommended_action) && priceArea.recommended_price !== null ? (
+                                <div className="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400">
+                                  → <span className="font-semibold text-zinc-800 dark:text-zinc-200">{formatPrice(priceArea.recommended_price, priceArea.currency)}</span>
+                                  {priceArea.recommended_price_change_pct !== null && (
+                                    <span className="ml-1">({formatPriceChange(priceArea.recommended_price_change_pct)})</span>
+                                  )}
+                                  <span className="ml-1">· {priceArea.current_public_availability} dostępnych · pewność {pricingConfidenceLabel(priceArea.scenario_confidence)}</span>
+                                </div>
+                              ) : (
+                                <div className="mt-1 text-[10px] text-zinc-400">
+                                  {priceArea.current_public_availability} dostępnych · {priceAreaReason(priceArea)}
+                                </div>
+                              )}
+                            </div>
+                          ))}
                         </div>
-                        <div className="mt-0.5 text-[10px] text-zinc-400">Wymagany split przed rekomendacją ceny</div>
-                      </div>
+                      ) : (
+                        <div>
+                          <div className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                            Wiele price areas
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-zinc-400">Split cenowy jest jeszcze odświeżany</div>
+                        </div>
+                      )
                     ) : row.current_price === null ? (
                       <span className="text-[11px] text-zinc-400">Brak ceny · rekomendacja oczekuje</span>
                     ) : (
@@ -481,7 +552,7 @@ export const SectorPerformancePanel: React.FC<SectorPerformancePanelProps> = ({ 
       )}
 
       <div className="border-t border-zinc-200 bg-zinc-50/60 px-4 py-3 text-[10px] leading-relaxed text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950/30 sm:px-5">
-        „Gap” oznacza różnicę względem tempa całego eventu. Dodatni gap = więcej publicznie dostępnych miejsc niż oczekiwalibyśmy przy obecnym tempie eventu. Projekcja „na kickoff” jest scenariuszem kontynuacji obecnego trendu, nie prognozą potwierdzonej sprzedaży. Dynamic pricing jest obecnie scenariuszem opartym na rzeczywistej cenie i jawnych założeniach elastyczności; wymaga decyzji człowieka i nie zmienia ceny automatycznie.
+        „Gap” oznacza różnicę względem tempa całego eventu. Dodatni gap = więcej publicznie dostępnych miejsc niż oczekiwalibyśmy przy obecnym tempie eventu. Projekcja „na kickoff” jest scenariuszem kontynuacji obecnego trendu, nie prognozą potwierdzonej sprzedaży. Dynamic pricing jest obecnie scenariuszem opartym na rzeczywistej cenie i jawnych założeniach elastyczności; wymaga decyzji człowieka i nie zmienia ceny automatycznie. W sektorach z wieloma price areas rekomendacja jest liczona osobno dla każdej rzeczywistej ceny, bez używania sztucznej średniej sektorowej.
       </div>
     </section>
   );
