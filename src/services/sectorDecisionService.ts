@@ -7,6 +7,7 @@ export type SectorStatus =
   | 'INSUFFICIENT_SIGNAL';
 
 export type SectorTrend = 'IMPROVING' | 'WEAKENING' | 'STABLE' | 'FLAT' | 'UNKNOWN';
+export type PricingAction = 'DECREASE' | 'HOLD' | 'INCREASE' | 'MONITOR';
 
 export interface SectorDecisionRow {
   ticket_event_id: number;
@@ -28,10 +29,24 @@ export interface SectorDecisionRow {
   projected_public_sell_through_proxy: number | null;
   projection_confidence: 'HIGH' | 'MEDIUM' | 'LOW' | 'INSUFFICIENT';
   projection_reason_code: string;
-  price_data_status: 'PRICE_DATA_MISSING' | string;
+  price_data_status: string;
   current_price: number | null;
   currency: string | null;
-  pricing_recommendation_status: 'PENDING_PRICE_DATA' | string;
+  pricing_recommendation_status: string;
+  recommended_price_change_pct: number | null;
+  recommended_price: number | null;
+  pricing_recommendation_action: PricingAction | null;
+  pricing_scenario_confidence: 'HIGH' | 'MEDIUM' | 'LOW' | null;
+  pricing_recommendation_reason_code: string | null;
+  pricing_maturity_label: string | null;
+  pricing_commercial_guardrails_status: string | null;
+  pricing_projected_public_availability_at_kickoff: number | null;
+  pricing_additional_absorption_delta_vs_hold: number | null;
+  pricing_revenue_proxy_delta_vs_hold: number | null;
+  pricing_requires_human_review: boolean | null;
+  auto_price_change_allowed: boolean | null;
+  pricing_recommendation_version: string | null;
+  pricing_assumption_set_version: string | null;
   data_quality_status: string;
   decision_version: string;
   status_policy_version: string;
@@ -58,8 +73,20 @@ export interface SectorSummaryRow {
   top_underperforming_sector: string | null;
   top_underperforming_gap_available: number | null;
   top_underperforming_projected_available: number | null;
-  price_data_status: 'PRICE_DATA_MISSING' | string;
-  pricing_recommendation_status: 'PENDING_PRICE_DATA' | string;
+  price_data_status: string;
+  pricing_recommendation_status: string;
+  priced_sector_count: number | null;
+  pricing_actionable_count: number | null;
+  pricing_decrease_count: number | null;
+  pricing_hold_count: number | null;
+  pricing_increase_count: number | null;
+  pricing_monitor_count: number | null;
+  top_pricing_sector: string | null;
+  top_pricing_action: PricingAction | null;
+  top_pricing_current_price: number | null;
+  top_pricing_recommended_price: number | null;
+  top_pricing_change_pct: number | null;
+  pricing_maturity_label: string | null;
   decision_version: string;
   refreshed_at: string;
 }
