@@ -54,6 +54,46 @@ export interface SectorDecisionRow {
   refreshed_at: string;
 }
 
+export interface PriceAreaPricingRow {
+  ticket_event_id: number;
+  sector: string;
+  sector_name: string | null;
+  sector_status: SectorStatus;
+  trend_state: SectorTrend;
+  hours_to_kickoff: number;
+  sector_gap_ratio: number | null;
+  projection_confidence: 'HIGH' | 'MEDIUM' | 'LOW' | 'INSUFFICIENT';
+  price_area_id: number;
+  price_area_name: string | null;
+  price_type_name: string | null;
+  current_price: number | null;
+  currency: string | null;
+  current_public_availability: number;
+  availability_share_of_sector: number | null;
+  baseline_projected_public_availability_at_kickoff: number | null;
+  baseline_additional_absorption_proxy: number | null;
+  minimum_actionable_absorption: number | null;
+  recommended_action: PricingAction;
+  recommended_price_change_pct: number | null;
+  recommended_price: number | null;
+  recommended_projected_public_availability_at_kickoff: number | null;
+  recommended_projected_additional_absorption: number | null;
+  additional_absorption_delta_vs_hold: number | null;
+  scenario_confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  recommendation_reason_code: string;
+  price_data_status: string;
+  requires_human_review: boolean;
+  auto_price_change_allowed: boolean;
+  maturity_label: string;
+  price_area_recommendation_version: string;
+  recommendation_policy_version: string;
+  assumption_set_version: string;
+  price_area_observed_at: string | null;
+  price_observed_at: string | null;
+  point_in_time_validated: boolean;
+  refreshed_at: string;
+}
+
 export interface SectorSummaryRow {
   ticket_event_id: number;
   home_team: string;
@@ -102,18 +142,23 @@ class SectorDecisionService {
   async getEventSectorDecision(eventId: string): Promise<{
     summary: SectorSummaryRow | null;
     sectors: SectorDecisionRow[];
+    priceAreas: PriceAreaPricingRow[];
   }> {
     const numericId = Number(eventId);
     if (!Number.isFinite(numericId)) {
-      return { summary: null, sectors: [] };
+      return { summary: null, sectors: [], priceAreas: [] };
     }
 
-    const [summaries, sectors] = await Promise.all([
+    const [summaries, sectors, priceAreas] = await Promise.all([
       fetchRows<SectorSummaryRow>('dashboard_sector_summary_current_v1', {
         select: '*',
         filters: { ticket_event_id: `eq.${numericId}` }
       }),
       fetchRows<SectorDecisionRow>('dashboard_sector_decision_current_v1', {
+        select: '*',
+        filters: { ticket_event_id: `eq.${numericId}` }
+      }),
+      fetchRows<PriceAreaPricingRow>('dashboard_price_area_pricing_current_v1', {
         select: '*',
         filters: { ticket_event_id: `eq.${numericId}` }
       })
@@ -130,9 +175,16 @@ class SectorDecisionService {
       return a.sector.localeCompare(b.sector, 'pl', { numeric: true });
     });
 
+    priceAreas.sort((a, b) => {
+      const sectorDelta = a.sector.localeCompare(b.sector, 'pl', { numeric: true });
+      if (sectorDelta !== 0) return sectorDelta;
+      return a.price_area_id - b.price_area_id;
+    });
+
     return {
       summary: summaries[0] ?? null,
-      sectors
+      sectors,
+      priceAreas
     };
   }
 }
