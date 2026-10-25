@@ -54,7 +54,7 @@ export function isActionableIngestionStatus(status: IngestionStatus): boolean {
 export function ingestionStatusLabel(status: IngestionStatus): string {
   switch (status) {
     case 'TRACKED': return 'Śledzony';
-    case 'TRACKED_NO_SNAPSHOT': return 'Brak snapshotu';
+    case 'TRACKED_NO_SNAPSHOT': return 'Śledzony • czeka na inventory';
     case 'COMPLETED_TRACKED': return 'Zakończony — dane zachowane';
     case 'BUFFERING_AWAITING_KICKOFF': return 'Krzywa zabezpieczona';
     case 'READY_TO_PROMOTE': return 'Gotowy do podpięcia';
