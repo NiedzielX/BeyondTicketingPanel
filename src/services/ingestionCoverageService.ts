@@ -5,10 +5,13 @@ export type IngestionStatus =
   | 'TRACKED_NO_SNAPSHOT'
   | 'COMPLETED_TRACKED'
   | 'BUFFERING_AWAITING_KICKOFF'
+  | 'BUFFERING_AWAITING_FIXTURE'
   | 'READY_TO_PROMOTE'
   | 'MATCH_DISCOVERED_NO_BUFFER'
+  | 'HIDDEN_AVAILABILITY'
   | 'NON_MATCH_EXCLUDED'
   | 'NON_FOOTBALL_EXCLUDED'
+  | 'NON_LEAGUE_EXCLUDED'
   | 'UNKNOWN_EXCLUDED';
 
 export interface IngestionCoverageRow {
@@ -39,15 +42,22 @@ export interface IngestionCoverageRow {
 const EXCLUDED = new Set<IngestionStatus>([
   'NON_MATCH_EXCLUDED',
   'NON_FOOTBALL_EXCLUDED',
+  'NON_LEAGUE_EXCLUDED',
   'UNKNOWN_EXCLUDED'
 ]);
+
+export function isProtectedBufferStatus(status: IngestionStatus): boolean {
+  return status === 'BUFFERING_AWAITING_KICKOFF' || status === 'BUFFERING_AWAITING_FIXTURE';
+}
 
 export function isActionableIngestionStatus(status: IngestionStatus): boolean {
   return [
     'TRACKED_NO_SNAPSHOT',
     'READY_TO_PROMOTE',
     'MATCH_DISCOVERED_NO_BUFFER',
-    'BUFFERING_AWAITING_KICKOFF'
+    'BUFFERING_AWAITING_KICKOFF',
+    'BUFFERING_AWAITING_FIXTURE',
+    'HIDDEN_AVAILABILITY'
   ].includes(status);
 }
 
@@ -56,11 +66,14 @@ export function ingestionStatusLabel(status: IngestionStatus): string {
     case 'TRACKED': return 'Śledzony';
     case 'TRACKED_NO_SNAPSHOT': return 'Śledzony • czeka na inventory';
     case 'COMPLETED_TRACKED': return 'Zakończony — dane zachowane';
-    case 'BUFFERING_AWAITING_KICKOFF': return 'Krzywa zabezpieczona';
+    case 'BUFFERING_AWAITING_KICKOFF': return 'Krzywa zabezpieczona • czeka na kickoff';
+    case 'BUFFERING_AWAITING_FIXTURE': return 'Krzywa zabezpieczona • czeka na fixture';
     case 'READY_TO_PROMOTE': return 'Gotowy do podpięcia';
     case 'MATCH_DISCOVERED_NO_BUFFER': return 'Wykryty — brak bufora';
+    case 'HIDDEN_AVAILABILITY': return 'Źródło ukrywa availability';
     case 'NON_MATCH_EXCLUDED': return 'Produkt wykluczony';
     case 'NON_FOOTBALL_EXCLUDED': return 'Poza piłką — wykluczony';
+    case 'NON_LEAGUE_EXCLUDED': return 'Poza ligą — wykluczony';
     case 'UNKNOWN_EXCLUDED': return 'Niejednoznaczny — wykluczony';
   }
 }
