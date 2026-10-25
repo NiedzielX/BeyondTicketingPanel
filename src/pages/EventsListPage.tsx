@@ -17,6 +17,7 @@ export const EventsListPage: React.FC<EventsListPageProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed'>('active');
   const [events, setEvents] = useState<EnrichedEvent[]>([]);
+  const [recentCompleted, setRecentCompleted] = useState<EnrichedEvent[]>([]);
   const [clubs, setClubs] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,15 +37,29 @@ export const EventsListPage: React.FC<EventsListPageProps> = ({
         const clubsList = await eventsService.getClubsList();
         setClubs(clubsList);
         const activeClub = isAllClubs(selectedClub) ? undefined : selectedClub;
-        const list = await eventsService.getEvents({
-          status: activeTab,
-          search: searchQuery,
-          club: activeClub,
-          commercialStatus: selectedCommercialStatus !== 'Wszystkie' ? selectedCommercialStatus : undefined,
-          sortBy,
-          sortOrder
-        });
+        const [list, completedList] = await Promise.all([
+          eventsService.getEvents({
+            status: activeTab,
+            search: searchQuery,
+            club: activeClub,
+            commercialStatus: selectedCommercialStatus !== 'Wszystkie' ? selectedCommercialStatus : undefined,
+            sortBy,
+            sortOrder
+          }),
+          eventsService.getEvents({
+            status: 'completed',
+            club: activeClub,
+            sortBy: 'date',
+            sortOrder: 'desc'
+          })
+        ]);
         setEvents(list);
+        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        setRecentCompleted(
+          completedList
+            .filter((event) => new Date(event.eventDate).getTime() >= sevenDaysAgo)
+            .slice(0, 8)
+        );
       } finally {
         setIsLoading(false);
       }
@@ -84,7 +99,7 @@ export const EventsListPage: React.FC<EventsListPageProps> = ({
               <span className="text-xs px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200 dark:border-indigo-800">{selectedClub}</span>
             )}
           </div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">W jednym miejscu: widoczne wolne miejsca, poziom zainteresowania, prognozowana frekwencja i rzeczywisty wynik po meczu.</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Nadchodzące eventy pozostają na pierwszym planie, a mecze zakończone w ostatnich 7 dniach są widoczne poniżej — nie znikają po kickoffie.</p>
         </div>
 
         <div className="inline-flex rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100/80 dark:bg-zinc-800/80 p-0.5 text-xs">
@@ -122,7 +137,21 @@ export const EventsListPage: React.FC<EventsListPageProps> = ({
         </div>
       </div>
 
-      <EventsTable events={events} onSelectEvent={onSelectEvent} sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} showOutcomeColumns={activeTab === 'completed' || activeTab === 'all'} />
+      {isLoading ? (
+        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-8 text-center text-xs text-zinc-500">Ładowanie meczów…</div>
+      ) : (
+        <EventsTable events={events} onSelectEvent={onSelectEvent} sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} showOutcomeColumns={activeTab === 'completed' || activeTab === 'all'} />
+      )}
+
+      {activeTab === 'active' && recentCompleted.length > 0 && (
+        <section className="pt-2 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Ostatnio zakończone</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">Mecze z ostatnich 7 dni pozostają pod ręką wraz z zachowaną krzywą i wynikiem, jeśli outcome jest już potwierdzony.</p>
+          </div>
+          <EventsTable events={recentCompleted} onSelectEvent={onSelectEvent} sortBy="date" sortOrder="desc" onSort={() => undefined} showOutcomeColumns />
+        </section>
+      )}
     </div>
   );
 };
