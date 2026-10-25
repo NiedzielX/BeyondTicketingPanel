@@ -9,6 +9,7 @@ export type IngestionStatus =
   | 'READY_TO_PROMOTE'
   | 'MATCH_DISCOVERED_NO_BUFFER'
   | 'HIDDEN_AVAILABILITY'
+  | 'SCHEDULE_GAP'
   | 'NON_MATCH_EXCLUDED'
   | 'NON_FOOTBALL_EXCLUDED'
   | 'NON_LEAGUE_EXCLUDED'
@@ -16,7 +17,7 @@ export type IngestionStatus =
 
 export interface IngestionCoverageRow {
   record_key: string;
-  record_type: 'tracked' | 'candidate';
+  record_type: 'tracked' | 'candidate' | 'schedule_gap';
   club_slug: string | null;
   club_name: string | null;
   external_event_id: string | null;
@@ -52,6 +53,7 @@ export function isProtectedBufferStatus(status: IngestionStatus): boolean {
 
 export function isActionableIngestionStatus(status: IngestionStatus): boolean {
   return [
+    'SCHEDULE_GAP',
     'TRACKED_NO_SNAPSHOT',
     'READY_TO_PROMOTE',
     'MATCH_DISCOVERED_NO_BUFFER',
@@ -71,6 +73,7 @@ export function ingestionStatusLabel(status: IngestionStatus): string {
     case 'READY_TO_PROMOTE': return 'Gotowy do podpięcia';
     case 'MATCH_DISCOVERED_NO_BUFFER': return 'Wykryty — brak bufora';
     case 'HIDDEN_AVAILABILITY': return 'Źródło ukrywa availability';
+    case 'SCHEDULE_GAP': return 'Brak eventu ze źródła';
     case 'NON_MATCH_EXCLUDED': return 'Produkt wykluczony';
     case 'NON_FOOTBALL_EXCLUDED': return 'Poza piłką — wykluczony';
     case 'NON_LEAGUE_EXCLUDED': return 'Poza ligą — wykluczony';
