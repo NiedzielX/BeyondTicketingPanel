@@ -5,6 +5,7 @@ import { eventsService, isAllClubs } from '../services/eventsService';
 import { MetricCard } from '../components/common/MetricCard';
 import { FeaturedMatchCard } from '../components/common/FeaturedMatchCard';
 import { EventsTable } from '../components/table/EventsTable';
+import { IngestionCoveragePanel } from '../components/operations/IngestionCoveragePanel';
 import { formatPercent } from '../utils/formatters';
 
 interface OverviewPageProps {
@@ -158,6 +159,8 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
           highlight={kpis && kpis.eventsNeedingAttentionCount > 0 ? 'warning' : 'normal'}
         />
       </div>
+
+      <IngestionCoveragePanel onSelectEvent={onSelectEvent} />
 
       {kpis?.closestMatch && (
         <FeaturedMatchCard event={kpis.closestMatch.event} snapshots={kpis.closestMatch.snapshots} forecasts={kpis.closestMatch.forecasts} onSelectEvent={onSelectEvent} />
