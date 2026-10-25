@@ -5,7 +5,8 @@ import {
   IngestionCoverageRow,
   ingestionCoverageService,
   ingestionStatusLabel,
-  isActionableIngestionStatus
+  isActionableIngestionStatus,
+  isProtectedBufferStatus
 } from '../../services/ingestionCoverageService';
 
 interface IngestionCoveragePanelProps {
@@ -14,13 +15,15 @@ interface IngestionCoveragePanelProps {
 
 const statusClass = (status: IngestionCoverageRow['ingestion_status']) => {
   if (status === 'TRACKED') return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800';
-  if (status === 'BUFFERING_AWAITING_KICKOFF') return 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800';
-  if (status === 'TRACKED_NO_SNAPSHOT' || status === 'MATCH_DISCOVERED_NO_BUFFER') return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800';
+  if (isProtectedBufferStatus(status)) return 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800';
+  if (status === 'SCHEDULE_GAP' || status === 'TRACKED_NO_SNAPSHOT' || status === 'MATCH_DISCOVERED_NO_BUFFER') {
+    return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800';
+  }
   return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800';
 };
 
 const formatKickoff = (value: string | null) => {
-  if (!value) return 'Oczekuje na kickoff';
+  if (!value) return 'Termin znany • kickoff oczekuje';
   return new Intl.DateTimeFormat('pl-PL', {
     day: '2-digit',
     month: '2-digit',
@@ -28,6 +31,23 @@ const formatKickoff = (value: string | null) => {
     minute: '2-digit',
     timeZone: 'Europe/Warsaw'
   }).format(new Date(value));
+};
+
+const sourceLabel = (row: IngestionCoverageRow) => {
+  const source = row.mapping_source || '';
+  if (source.includes('stellis')) return 'Stellis';
+  if (source.includes('roboticket')) return 'RoboTicket';
+  if (source.includes('schedule-watchdog')) {
+    return source.endsWith(':stellis') ? 'Terminarz → Stellis' : source.endsWith(':roboticket') ? 'Terminarz → RoboTicket' : 'Terminarz';
+  }
+  if (row.source_url) {
+    try {
+      return new URL(row.source_url).hostname.replace(/^www\./, '');
+    } catch {
+      return 'Źródło';
+    }
+  }
+  return 'Źródło';
 };
 
 export const IngestionCoveragePanel: React.FC<IngestionCoveragePanelProps> = ({ onSelectEvent }) => {
@@ -55,8 +75,11 @@ export const IngestionCoveragePanel: React.FC<IngestionCoveragePanelProps> = ({ 
     [rows]
   );
   const healthy = activeRows.filter((row) => row.ingestion_status === 'TRACKED').length;
-  const protectedRows = activeRows.filter((row) => row.ingestion_status === 'BUFFERING_AWAITING_KICKOFF').length;
-  const alerts = activeRows.filter((row) => isActionableIngestionStatus(row.ingestion_status) && row.ingestion_status !== 'BUFFERING_AWAITING_KICKOFF').length;
+  const protectedRows = activeRows.filter((row) => isProtectedBufferStatus(row.ingestion_status)).length;
+  const scheduleGaps = activeRows.filter((row) => row.ingestion_status === 'SCHEDULE_GAP').length;
+  const alerts = activeRows.filter(
+    (row) => isActionableIngestionStatus(row.ingestion_status) && !isProtectedBufferStatus(row.ingestion_status)
+  ).length;
 
   if (isLoading) {
     return <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 text-xs text-zinc-500">Ładowanie pokrycia ingestu…</div>;
@@ -75,7 +98,7 @@ export const IngestionCoveragePanel: React.FC<IngestionCoveragePanelProps> = ({ 
             Pokrycie ingestu meczów
           </h2>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Czy każdy wykryty domowy mecz jest już śledzony lub ma zabezpieczoną surową krzywą przed pełnym mapowaniem.
+            Kontrola w obie strony: każdy znany domowy mecz z terminarza powinien być śledzony albo mieć zabezpieczoną surową krzywą. Źródła: RoboTicket + Stellis.
           </p>
         </div>
         <div className="text-[11px] text-zinc-400 whitespace-nowrap">
@@ -83,10 +106,11 @@ export const IngestionCoveragePanel: React.FC<IngestionCoveragePanelProps> = ({ 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <MetricCard label="Śledzone" value={healthy} subtext="Normalny collector aktywny" tooltip="Przyszłe wydarzenia z poprawnym ticket_event i co najmniej jednym snapshotem inventory." />
-        <MetricCard label="Krzywa zabezpieczona" value={protectedRows} subtext="Czeka na dokładny kickoff" tooltip="Mecz nie jest jeszcze w normalnym pipeline, ale surowe snapshoty są zapisywane z oryginalnym captured_at i mogą zostać później bezpiecznie podpięte." highlight={protectedRows > 0 ? 'warning' : 'normal'} />
-        <MetricCard label="Luki wymagające uwagi" value={alerts} subtext="Brak snapshotu lub promocji" tooltip="Prawdziwe mecze, dla których ingest nie jest jeszcze w stanie bezpiecznym." highlight={alerts > 0 ? 'danger' : 'normal'} />
+        <MetricCard label="Krzywa zabezpieczona" value={protectedRows} subtext="Raw evidence zachowane" tooltip="Mecz nie jest jeszcze w normalnym pipeline, ale surowe snapshoty są zapisywane z oryginalnym captured_at i mogą zostać później bezpiecznie podpięte." highlight={protectedRows > 0 ? 'warning' : 'normal'} />
+        <MetricCard label="Luki terminarza" value={scheduleGaps} subtext="Mecz znany, eventu brak" tooltip="Terminarz zna nadchodzący domowy mecz, ale system biletowy nie dostarczył jeszcze canonical eventu ani bezpiecznego kandydata. To wczesny alert przed utratą krzywej." highlight={scheduleGaps > 0 ? 'danger' : 'normal'} />
+        <MetricCard label="Luki wymagające uwagi" value={alerts} subtext="Brak snapshotu / eventu" tooltip="Prawdziwe mecze, dla których ingest nie jest jeszcze w stanie bezpiecznym. Chronione raw buffery nie są liczone jako błąd." highlight={alerts > 0 ? 'danger' : 'normal'} />
       </div>
 
       {activeRows.length === 0 ? (
@@ -117,7 +141,9 @@ export const IngestionCoveragePanel: React.FC<IngestionCoveragePanelProps> = ({ 
                       className={`text-left ${row.ticket_event_id ? 'cursor-pointer hover:text-indigo-600' : 'cursor-default'} transition-colors`}
                     >
                       <div className="font-semibold text-zinc-900 dark:text-zinc-100">{row.label || 'Nieopisany kandydat'}</div>
-                      <div className="text-[11px] text-zinc-400 mt-0.5">{row.club_name || row.club_slug || '—'} · RoboTicket {row.external_event_id || '—'}</div>
+                      <div className="text-[11px] text-zinc-400 mt-0.5">
+                        {row.club_name || row.club_slug || '—'} · {sourceLabel(row)} {row.external_event_id || ''}
+                      </div>
                     </button>
                   </td>
                   <td className="py-3 px-3 whitespace-nowrap text-zinc-600 dark:text-zinc-300">{formatKickoff(row.kickoff_at)}</td>
