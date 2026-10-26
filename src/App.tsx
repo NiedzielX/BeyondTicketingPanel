@@ -11,6 +11,7 @@ import { DataQualityPage } from './pages/DataQualityPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ForecastAccuracyGuide } from './components/common/ForecastAccuracyGuide';
 import { ResearchReadinessPanel } from './components/research/ResearchReadinessPanel';
+import { P9MaeStatusPanel } from './components/research/P9MaeStatusPanel';
 import { WeatherResearchPanel } from './components/research/WeatherResearchPanel';
 import { DemandSignalsPanel } from './components/research/DemandSignalsPanel';
 import { SportingContextPanel } from './components/research/SportingContextPanel';
@@ -168,6 +169,7 @@ export default function App() {
                       Zaplecze badawcze Beyond. Tutaj sprawdzamy, czy mamy dość danych i czy nowe sygnały naprawdę poprawiają prognozę. Nic z tej sekcji nie trafia automatycznie do głównego modelu.
                     </p>
                   </div>
+                  <P9MaeStatusPanel />
                   <ContextMatrixPanel />
                   <ModelEvidenceScorecardPanel />
                   <ModelPromotionGovernancePanel />
