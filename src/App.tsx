@@ -154,6 +154,7 @@ export default function App() {
               {currentTab === 'forecast-accuracy' && (
                 <div className="space-y-6">
                   <ForecastAccuracyGuide />
+                  <P9MaeStatusPanel />
                   <ForecastAccuracyPage
                     selectedClubFilter={selectedClubContext}
                     onClubFilterChange={setSelectedClubContext}
