@@ -11,6 +11,12 @@ const deltaLabel = (value?: number) => {
   return `${value > 0 ? '+' : ''}${rounded}`;
 };
 
+const attemptTime = (value?: string) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('pl-PL');
+};
+
 const Metric: React.FC<{ label: string; value: React.ReactNode; note: string }> = ({ label, value, note }) => (
   <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3.5">
     <div className="text-[10px] uppercase tracking-wide text-zinc-400">{label}</div>
@@ -47,6 +53,30 @@ export const P9MaeStatusPanel: React.FC = () => {
     data.deltaEventBalancedMae !== undefined;
 
   const improvesMae = hasMaeEvidence && (data.deltaEventBalancedMae ?? 0) < 0;
+  const hasAttempts = data.prospectiveAttemptRows > 0;
+  const hasFailClosedSupport = data.prospectiveSupportInsufficientAttempts > 0;
+  const hasMissingIncumbent = data.prospectiveNoTargetIncumbentAttempts > 0;
+  const hasReadyPrediction = data.prospectivePredictionReadyAttempts > 0;
+
+  const prospectiveState = !hasAttempts
+    ? 'WAITING FOR FIRST WINDOW'
+    : hasReadyPrediction
+      ? 'IMMUTABLE WINDOW CAPTURED'
+      : hasFailClosedSupport
+        ? 'WINDOW CAPTURED · SUPPORT INSUFFICIENT'
+        : hasMissingIncumbent
+          ? 'WINDOW CAPTURED · NO INCUMBENT'
+          : data.prospectiveEvidenceStatus;
+
+  const prospectiveNote = !hasAttempts
+    ? 'Pierwsze immutable T-48/T-24 window jeszcze nie zostało przechwycone. 0 predykcji nie jest wynikiem MAE.'
+    : data.prospectivePredictionRows === 0 && hasFailClosedSupport
+      ? 'Okno zostało przechwycone poprawnie, ale frozen learner nie miał minimum 3 PIT-safe residual references. To kontrolowany fail-closed, nie wynik MAE.'
+      : data.prospectivePredictionRows === 0 && hasMissingIncumbent
+        ? 'Okno zostało przechwycone, ale nie było PIT-safe incumbent forecastu dla targetu. Nie powstała challenger prediction.'
+        : data.prospectiveScoredEvents === 0
+          ? 'Immutable prediction została zapisana. Czekamy na genuine outcome; do tego momentu nie ma prospective ΔMAE.'
+          : 'Mamy genuine prospective scored events. North Star poniżej pokazuje event-balanced challenger MAE vs incumbent.';
 
   return (
     <div className="rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/20 dark:bg-indigo-950/10 p-4 sm:p-5">
@@ -91,16 +121,22 @@ export const P9MaeStatusPanel: React.FC = () => {
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
             <div>
               <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">Prospective P9 v1</div>
-              <div className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">{data.prospectiveEvidenceStatus}</div>
+              <div className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">{prospectiveState}</div>
             </div>
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-            <div><div className="text-lg font-semibold tabular-nums">{data.prospectivePredictionEvents}</div><div className="text-[10px] text-zinc-500">eventy</div></div>
+          <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+            <div><div className="text-lg font-semibold tabular-nums">{data.prospectiveAttemptRows}</div><div className="text-[10px] text-zinc-500">próby</div></div>
+            <div><div className="text-lg font-semibold tabular-nums">{data.prospectivePredictionReadyAttempts}</div><div className="text-[10px] text-zinc-500">ready</div></div>
             <div><div className="text-lg font-semibold tabular-nums">{data.prospectivePredictionRows}</div><div className="text-[10px] text-zinc-500">predykcje</div></div>
             <div><div className="text-lg font-semibold tabular-nums">{data.prospectiveScoredEvents}</div><div className="text-[10px] text-zinc-500">scored</div></div>
           </div>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-zinc-500 dark:text-zinc-400">
+            <span>support insufficient: <strong>{data.prospectiveSupportInsufficientAttempts}</strong></span>
+            <span>no incumbent: <strong>{data.prospectiveNoTargetIncumbentAttempts}</strong></span>
+            <span>last attempt: <strong>{attemptTime(data.prospectiveLastAttemptedAt)}</strong></span>
+          </div>
           <p className="mt-3 text-[10px] leading-relaxed text-zinc-500 dark:text-zinc-400">
-            Prognozy są zapisywane wyłącznie w zamrożonych T-48/T-24 windows. Brak scored eventów oznacza „czekamy na outcome”, nie MAE = 0.
+            {prospectiveNote}
           </p>
         </div>
 
@@ -125,6 +161,7 @@ export const P9MaeStatusPanel: React.FC = () => {
         <span>Precommit: <strong>{data.designPrecommitted ? 'tak' : 'nie'}</strong></span>
         <span>Historical gate: <strong>{data.fullWindowGateOpen ? 'open' : 'closed'}</strong></span>
         <span>Historical labels opened: <strong>{data.historicalAttendanceValuesOpened ? 'tak' : 'nie'}</strong></span>
+        <span>Prospective attempt events: <strong>{data.prospectiveAttemptEvents}</strong></span>
         <span>Production activation: <strong>{data.productionActivationAllowed ? 'allowed' : 'blocked'}</strong></span>
       </div>
     </div>

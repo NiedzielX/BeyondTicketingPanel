@@ -18,6 +18,12 @@ export interface P9MaeStatus {
   prospectivePredictionEvents: number;
   prospectivePredictionRows: number;
   prospectiveScoredEvents: number;
+  prospectiveAttemptEvents: number;
+  prospectiveAttemptRows: number;
+  prospectivePredictionReadyAttempts: number;
+  prospectiveSupportInsufficientAttempts: number;
+  prospectiveNoTargetIncumbentAttempts: number;
+  prospectiveLastAttemptedAt?: string;
   incumbentEventBalancedMae?: number;
   challengerEventBalancedMae?: number;
   deltaEventBalancedMae?: number;
@@ -46,6 +52,12 @@ interface P9MaeStatusRow {
   prospective_prediction_events: number;
   prospective_prediction_rows: number;
   prospective_scored_events: number;
+  prospective_attempt_events: number;
+  prospective_attempt_rows: number;
+  prospective_prediction_ready_attempts: number;
+  prospective_support_insufficient_attempts: number;
+  prospective_no_target_incumbent_attempts: number;
+  prospective_last_attempted_at: string | null;
   incumbent_event_balanced_mae: number | null;
   challenger_event_balanced_mae: number | null;
   delta_event_balanced_mae: number | null;
@@ -85,6 +97,12 @@ class P9MaeStatusService {
       prospectivePredictionEvents: Number(row.prospective_prediction_events),
       prospectivePredictionRows: Number(row.prospective_prediction_rows),
       prospectiveScoredEvents: Number(row.prospective_scored_events),
+      prospectiveAttemptEvents: Number(row.prospective_attempt_events),
+      prospectiveAttemptRows: Number(row.prospective_attempt_rows),
+      prospectivePredictionReadyAttempts: Number(row.prospective_prediction_ready_attempts),
+      prospectiveSupportInsufficientAttempts: Number(row.prospective_support_insufficient_attempts),
+      prospectiveNoTargetIncumbentAttempts: Number(row.prospective_no_target_incumbent_attempts),
+      prospectiveLastAttemptedAt: row.prospective_last_attempted_at ?? undefined,
       incumbentEventBalancedMae: optionalNumber(row.incumbent_event_balanced_mae),
       challengerEventBalancedMae: optionalNumber(row.challenger_event_balanced_mae),
       deltaEventBalancedMae: optionalNumber(row.delta_event_balanced_mae),
