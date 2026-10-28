@@ -29,6 +29,21 @@ export interface P9MaeStatus {
   deltaEventBalancedMae?: number;
   eventImprovementRate?: number;
   worstEventDegradation?: number;
+  fallbackAttemptEvents: number;
+  fallbackAttemptRows: number;
+  fallbackV1CoveredAttempts: number;
+  fallbackReadyAttempts: number;
+  fallbackSupportInsufficientAttempts: number;
+  fallbackPredictionEvents: number;
+  fallbackPredictionRows: number;
+  fallbackScoredEvents: number;
+  fallbackIncumbentEventBalancedMae?: number;
+  fallbackChallengerEventBalancedMae?: number;
+  fallbackDeltaEventBalancedMae?: number;
+  fallbackEventImprovementRate?: number;
+  fallbackWorstEventDegradation?: number;
+  fallbackFirstAttemptedAt?: string;
+  fallbackLastAttemptedAt?: string;
   productionActivationAllowed: boolean;
   liveAdjustment: number;
   productionChange: boolean;
@@ -63,6 +78,21 @@ interface P9MaeStatusRow {
   delta_event_balanced_mae: number | null;
   event_improvement_rate: number | null;
   worst_event_degradation: number | null;
+  fallback_attempt_events: number;
+  fallback_attempt_rows: number;
+  fallback_v1_covered_attempts: number;
+  fallback_ready_attempts: number;
+  fallback_support_insufficient_attempts: number;
+  fallback_prediction_events: number;
+  fallback_prediction_rows: number;
+  fallback_scored_events: number;
+  fallback_incumbent_event_balanced_mae: number | null;
+  fallback_challenger_event_balanced_mae: number | null;
+  fallback_delta_event_balanced_mae: number | null;
+  fallback_event_improvement_rate: number | null;
+  fallback_worst_event_degradation: number | null;
+  fallback_first_attempted_at: string | null;
+  fallback_last_attempted_at: string | null;
   production_activation_allowed: boolean;
   live_adjustment: number;
   production_change: boolean;
@@ -108,6 +138,21 @@ class P9MaeStatusService {
       deltaEventBalancedMae: optionalNumber(row.delta_event_balanced_mae),
       eventImprovementRate: optionalNumber(row.event_improvement_rate),
       worstEventDegradation: optionalNumber(row.worst_event_degradation),
+      fallbackAttemptEvents: Number(row.fallback_attempt_events),
+      fallbackAttemptRows: Number(row.fallback_attempt_rows),
+      fallbackV1CoveredAttempts: Number(row.fallback_v1_covered_attempts),
+      fallbackReadyAttempts: Number(row.fallback_ready_attempts),
+      fallbackSupportInsufficientAttempts: Number(row.fallback_support_insufficient_attempts),
+      fallbackPredictionEvents: Number(row.fallback_prediction_events),
+      fallbackPredictionRows: Number(row.fallback_prediction_rows),
+      fallbackScoredEvents: Number(row.fallback_scored_events),
+      fallbackIncumbentEventBalancedMae: optionalNumber(row.fallback_incumbent_event_balanced_mae),
+      fallbackChallengerEventBalancedMae: optionalNumber(row.fallback_challenger_event_balanced_mae),
+      fallbackDeltaEventBalancedMae: optionalNumber(row.fallback_delta_event_balanced_mae),
+      fallbackEventImprovementRate: optionalNumber(row.fallback_event_improvement_rate),
+      fallbackWorstEventDegradation: optionalNumber(row.fallback_worst_event_degradation),
+      fallbackFirstAttemptedAt: row.fallback_first_attempted_at ?? undefined,
+      fallbackLastAttemptedAt: row.fallback_last_attempted_at ?? undefined,
       productionActivationAllowed: row.production_activation_allowed,
       liveAdjustment: Number(row.live_adjustment),
       productionChange: row.production_change
