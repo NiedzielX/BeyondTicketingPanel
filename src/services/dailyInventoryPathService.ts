@@ -177,7 +177,7 @@ export function parseDailyInventoryPathFeed(input: unknown): DailyInventoryPathF
     }
     const leads = new Set<number>();
     let inputHash: string | undefined;
-    const points: DailyInventoryPathPoint[] = event.points.map((raw, pointIndex) => {
+    const points: DailyInventoryPathPoint[] = event.points.map((raw, pointIndex): DailyInventoryPathPoint => {
       const at = `${path}.points[${pointIndex}]`;
       const point = record(raw, at);
       const target = timestamp(point.target_at, `${at}.target_at`);
