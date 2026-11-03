@@ -34,16 +34,17 @@ export const SalesForecastChart: React.FC<SalesForecastChartProps> = ({
 
   const timelineMap = new Map<string, { timestamp: string; proxy?: number; forecast?: number }>();
   snapshots.forEach((snapshot) => {
-    const dayKey = snapshot.timestamp.substring(0, 10);
-    const existing = timelineMap.get(dayKey) || { timestamp: snapshot.timestamp };
-    existing.proxy = snapshot.sold;
-    timelineMap.set(dayKey, existing);
+    const dayKey = `proxy-${snapshot.timestamp.substring(0, 10)}`;
+    const existing = timelineMap.get(dayKey);
+    if (existing && Date.parse(existing.timestamp) > Date.parse(snapshot.timestamp)) return;
+    const value = { timestamp: snapshot.timestamp, proxy: snapshot.sold };
+    timelineMap.set(dayKey, value);
   });
   forecasts.forEach((forecast) => {
-    const dayKey = forecast.timestamp.substring(0, 10);
-    const existing = timelineMap.get(dayKey) || { timestamp: forecast.timestamp };
-    existing.forecast = forecast.predictedFinalSales;
-    timelineMap.set(dayKey, existing);
+    const dayKey = `forecast-${forecast.timestamp.substring(0, 10)}`;
+    const existing = timelineMap.get(dayKey);
+    if (existing && Date.parse(existing.timestamp) > Date.parse(forecast.timestamp)) return;
+    timelineMap.set(dayKey, { timestamp: forecast.timestamp, forecast: forecast.predictedFinalSales });
   });
 
   const sortedDays = Array.from(timelineMap.entries()).sort(
@@ -89,7 +90,9 @@ export const SalesForecastChart: React.FC<SalesForecastChartProps> = ({
   if (actualOutcome) allValues.push(actualOutcome);
   if (capacity && capacity < 50000) allValues.push(capacity * 1.05);
   const yMax = Math.ceil(Math.max(...allValues, 1000) / 5000) * 5000;
-  const getX = (index: number) => points.length === 1 ? padding.left + plotWidth / 2 : padding.left + (index / (points.length - 1)) * plotWidth;
+  const firstAt = Date.parse(points[0].timestamp);
+  const timeSpan = Date.parse(points[points.length - 1].timestamp) - firstAt;
+  const getX = (index: number) => timeSpan === 0 ? padding.left + plotWidth / 2 : padding.left + ((Date.parse(points[index].timestamp) - firstAt) / timeSpan) * plotWidth;
   const getY = (value: number) => padding.top + plotHeight - (Math.max(0, Math.min(yMax, value)) / yMax) * plotHeight;
 
   const proxyPoints = points.filter((point) => point.proxy !== undefined);
@@ -174,7 +177,7 @@ export const SalesForecastChart: React.FC<SalesForecastChartProps> = ({
             <circle key={`proxy-${point.index}`} cx={getX(point.index)} cy={getY(point.proxy!)} r={hoveredPoint?.index === point.index ? 5.5 : 4} className="fill-indigo-600 stroke-white dark:stroke-zinc-900 transition-all" strokeWidth="2" />
           ))}
 
-          {points.map((point) => {
+          {points.filter((point, index) => index === 0 || index === points.length - 1 || index % Math.max(1, Math.ceil(points.length / 6)) === 0).map((point) => {
             const x = getX(point.index);
             return (
               <g key={`x-${point.index}`}>
@@ -188,8 +191,9 @@ export const SalesForecastChart: React.FC<SalesForecastChartProps> = ({
           {cursorX !== null && <line x1={cursorX} y1={padding.top} x2={cursorX} y2={height - padding.bottom} stroke="#6366f1" strokeWidth="1" strokeDasharray="2 2" />}
           {points.map((point) => {
             const x = getX(point.index);
-            const zoneWidth = plotWidth / points.length;
-            return <rect key={`zone-${point.index}`} x={x - zoneWidth / 2} y={padding.top} width={zoneWidth} height={plotHeight} fill="transparent" className="cursor-crosshair" onMouseEnter={() => { setHoveredPoint(point); setCursorX(x); }} />;
+            const previousX = point.index === 0 ? padding.left : (getX(point.index - 1) + x) / 2;
+            const nextX = point.index === points.length - 1 ? padding.left + plotWidth : (getX(point.index + 1) + x) / 2;
+            return <rect key={`zone-${point.index}`} x={previousX} y={padding.top} width={Math.max(0, nextX - previousX)} height={plotHeight} fill="transparent" className="cursor-crosshair" onMouseEnter={() => { setHoveredPoint(point); setCursorX(x); }} />;
           })}
         </svg>
       </div>

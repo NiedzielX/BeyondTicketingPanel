@@ -6,3 +6,4 @@ coverage/
 *.log
 .env*
 !.env.example
+/public/research/daily-inventory-path-v1.json
