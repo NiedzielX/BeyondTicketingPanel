@@ -57,6 +57,7 @@ export const DailyInventoryPathChart: React.FC<DailyInventoryPathChartProps> = (
   const scoredPoints = event?.points.filter((point) => point.score) ?? [];
   const vintageMae = scoredPoints.length ? scoredPoints.reduce((sum, point) => sum + point.score!.candidate_abs_error, 0) / scoredPoints.length : undefined;
   const baselineMae = scoredPoints.length ? scoredPoints.reduce((sum, point) => sum + point.score!.baseline_abs_error, 0) / scoredPoints.length : undefined;
+  const zeroOnlyHistory = Boolean(event?.observations.length && event.observations.every((point) => point.available_total === 0));
   const trainedLead = state.status === 'ready' && state.trainingSupport && event && state.trainingSupport.model_sha256 === event.model_sha256 ? state.trainingSupport.max_lead_days : undefined;
 
   let emptyMessage: string | undefined;
@@ -137,6 +138,7 @@ export const DailyInventoryPathChart: React.FC<DailyInventoryPathChartProps> = (
             </div>)}
           </div> : <p className="mt-2 text-xs text-zinc-500">Do meczu nie pozostał już kolejny pełny dzienny punkt prognozy.</p>}
           <p className="mt-3 text-[11px] text-zinc-500 leading-relaxed">To prognoza miejsc widocznych jako dostępne publicznie. Wzrost lub spadek tej liczby nie wyjaśnia samodzielnie sprzedaży, blokad ani uwalniania puli. Podgląd nie stanowi jeszcze potwierdzenia jakości na przyszłych meczach.</p>
+          {zeroOnlyHistory && <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">Historia zawiera wyłącznie zerowe odczyty dostępności. Nie jest to potwierdzenie wyprzedania ani sprzedaży.</p>}
           {trainedLead !== undefined && event.points.some((point) => point.lead_days > trainedLead) && <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">Punkty dalsze niż {trainedLead} dni od chwili wydania są ekstrapolacją poza zakresem dni obecnych w treningu. Ich dokładność wymaga osobnego sprawdzenia.</p>}
           <details className="mt-3 text-xs text-zinc-500">
             <summary className="cursor-pointer">Wartości na kolejne dni i pochodzenie prognozy</summary>

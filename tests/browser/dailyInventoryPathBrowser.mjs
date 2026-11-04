@@ -117,6 +117,20 @@ try {
   await page.screenshot({ path: path.join(output, 'daily-path-mobile.png'), fullPage: true });
   checks.push('mobile width without page overflow');
 
+  const zeroOnly = fixture();
+  for (const vintage of zeroOnly.events) {
+    for (const observation of vintage.observations) observation.available_total = 0;
+    for (const point of vintage.points) {
+      point.predicted_available_total = 0;
+      point.baseline_available_total = 0;
+      if (point.score) { point.score.candidate_abs_error = 0; point.score.baseline_abs_error = 0; }
+    }
+  }
+  await load(zeroOnly); await plot().waitFor();
+  await page.getByText('Historia zawiera wyłącznie zerowe odczyty dostępności.', { exact: false }).waitFor();
+  assert.equal(await predictions().count(), 5);
+  checks.push('zero-only observed history remains distinct from confirmed sellout or sales');
+
   for (const [name, data, status, type, message] of [
     ['missing', {}, 404, 'application/json', 'Dla tego meczu nie ma jeszcze zapisanej prognozy kolejnych dni.'],
     ['SPA absent export', '<html>missing export</html>', 200, 'text/html', 'Dla tego meczu nie ma jeszcze zapisanej prognozy kolejnych dni.'],
