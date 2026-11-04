@@ -10,6 +10,7 @@ import { eventsService, isAllClubs } from '../services/eventsService';
 import { modelPerformanceService } from '../services/modelPerformanceService';
 import { strictHorizonService } from '../services/strictHorizonService';
 import { MetricCard } from '../components/common/MetricCard';
+import { C1LiveStatusPanel } from '../components/common/C1LiveStatusPanel';
 import { HorizonPerformanceChart } from '../components/charts/HorizonPerformanceChart';
 import { formatNumber, formatPercent } from '../utils/formatters';
 
@@ -216,6 +217,8 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
           ))}
         </select>
       </div>
+
+      <C1LiveStatusPanel />
 
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <MetricCard

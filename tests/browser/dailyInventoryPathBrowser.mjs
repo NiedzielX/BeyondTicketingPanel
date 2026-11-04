@@ -148,6 +148,45 @@ try {
   await page.getByText('dane nie spełniały warunków', { exact: false }).waitFor();
   assert.equal(await plot().count(), 0);
   checks.push('failed-input vintage has no invented predictions');
+
+  // Independent synthetic C1 status proves this card never borrows the panel's
+  // structural forecast aggregate or treats missing outcomes as zero MAE.
+  const c1Pattern = '**/rest/v1/dashboard_c1_shadow_v8_status_v1?*';
+  const c1Row = {
+    status: 'EXPERIMENTAL_SHADOW', package_version: 'c1-shadow-v8-frozen-2026-10-16-n9',
+    live_model_id: 'c1-v2-live-ridge-directocc-compact-generic-a10',
+    policy_id: 'c1-alpha-reliability-policy-v8-fixed-10pp-positive-slope-20pp-single', production_live_adjustment: 0,
+    prediction_row_count: 8, prospective_event_count: 3, scored_event_count: 2,
+    latest_row_policy_mae: 123.45, latest_row_prior_mae: 234.56, latest_row_live_mae: 345.67,
+    representative_window_policy_mae: 456.78, latest_prediction_at: '2026-11-03T12:00:00Z',
+    latest_score_at: '2026-11-02T12:00:00Z', refreshed_at: '2026-11-04T12:00:00Z',
+  };
+  async function loadC1(rows, status = 200) {
+    await page.unroute(c1Pattern);
+    await page.route(c1Pattern, route => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(rows) }));
+    await page.goto(base + '/tests/browser/c1-live.html');
+  }
+  await loadC1([c1Row]);
+  const c1 = page.getByRole('region', { name: 'Wyniki eksperymentu C1 v8' });
+  await c1.getByText('123,45 osób', { exact: true }).waitFor();
+  await c1.getByText('234,56 osób', { exact: true }).waitFor();
+  await c1.getByText('345,67 osób', { exact: true }).waitFor();
+  await c1.getByText('Wszystkie kluby, niezależnie od filtra strony.', { exact: false }).waitFor();
+  const refreshC1 = page.waitForResponse(response => response.url().includes('/dashboard_c1_shadow_v8_status_v1?'));
+  await page.getByRole('button', { name: 'Odśwież C1' }).click(); await refreshC1;
+  await c1.getByText('123,45 osób', { exact: true }).waitFor();
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  await page.screenshot({ path: path.join(output, 'c1-live-synthetic-mobile.png'), fullPage: true });
+  checks.push('C1 independent live scoreboard, global scope, refresh and mobile width');
+  await loadC1([{ ...c1Row, scored_event_count: 0, latest_score_at: null, latest_row_policy_mae: null,
+    latest_row_prior_mae: null, latest_row_live_mae: null, representative_window_policy_mae: null }]);
+  await c1.getByText('Oczekuje na potwierdzone wyniki.', { exact: false }).waitFor();
+  assert.equal(await c1.getByText('0,00 osób', { exact: true }).count(), 0);
+  await loadC1([]); await c1.getByText('Brak opublikowanego zestawienia C1.').waitFor();
+  await loadC1([{ ...c1Row, live_model_id: 'wrong-model' }]);
+  await c1.getByRole('alert').waitFor();
+  await loadC1({}, 503); await c1.getByRole('alert').waitFor();
+  checks.push('C1 pending/missing/wrong-model/HTTP failure never manufacture zero MAE');
   assert.deepEqual(errors, [], 'browser must not have unhandled runtime errors');
   await writeFile(path.join(output, 'result.json'), JSON.stringify({ status: 'PASS', fixture_only: true, checks }, null, 2));
   console.log(JSON.stringify({ status: 'PASS', fixture_only: true, checks }, null, 2));

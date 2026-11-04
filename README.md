@@ -73,3 +73,11 @@ node --experimental-strip-types --test src/services/dailyInventoryPathService.te
 ```
 
 The normal application checks remain `npm run lint` and `npm run build` after installing dependencies.
+
+## Existing C1 v8 live-shadow scoreboard — 2026-11-04
+
+Forecast Accuracy includes a separate global C1 v8 section, read with the browser's existing publishable role from `dashboard_c1_shadow_v8_status_v1`. It displays the governed policy, raw expert and shared-prior latest-per-event attendance MAEs, scored independent events, prediction coverage and latest score/prediction timestamps. Representative-window MAE is labelled separately. This section always covers all clubs and does not inherit the page's club filter or substitute the structural forecast table's metric.
+
+Missing/invalid data produces an explicit missing/error state; zero scored events require null MAE. A scored zero error is valid. Refresh is explicit. No experimental model is activated, and no service credential or frozen score is changed. This section describes existing C1 v8, not the new separately collecting training-expansion candidate.
+
+The eight C1 parser checks run with `node --experimental-strip-types --test src/services/c1LiveStatusContract.test.ts`. The existing isolated Chromium contract also exercises the actual C1 component using explicitly synthetic success/pending/missing/invalid/network-failure responses. These are correctness checks, not new model-accuracy evidence.

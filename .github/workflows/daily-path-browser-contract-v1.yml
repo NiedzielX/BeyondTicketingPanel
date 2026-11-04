@@ -6,12 +6,16 @@ on:
       - 'tests/browser/**'
       - 'src/components/charts/DailyInventoryPath*'
       - 'src/services/dailyInventoryPathService*'
+      - 'src/services/c1LiveStatus*'
+      - 'src/components/common/C1LiveStatusPanel.tsx'
       - '.github/workflows/daily-path-browser-contract-v1.yml'
   pull_request:
     paths:
       - 'tests/browser/**'
       - 'src/components/charts/DailyInventoryPath*'
       - 'src/services/dailyInventoryPathService*'
+      - 'src/services/c1LiveStatus*'
+      - 'src/components/common/C1LiveStatusPanel.tsx'
       - '.github/workflows/daily-path-browser-contract-v1.yml'
   workflow_dispatch:
 
@@ -29,6 +33,8 @@ jobs:
           node-version: '24'
       - name: Install existing app dependencies
         run: npm install
+      - name: Verify independent C1 scoreboard contract
+        run: node --experimental-strip-types --test src/services/c1LiveStatusContract.test.ts
       - name: Install isolated pinned browser tooling
         run: |
           python3 - <<'PY'
