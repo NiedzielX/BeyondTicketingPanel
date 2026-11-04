@@ -10,6 +10,7 @@ import { eventsService, isAllClubs } from '../services/eventsService';
 import { modelPerformanceService } from '../services/modelPerformanceService';
 import { strictHorizonService } from '../services/strictHorizonService';
 import { MetricCard } from '../components/common/MetricCard';
+import { C1LiveStatusPanel } from '../components/common/C1LiveStatusPanel';
 import { HorizonPerformanceChart } from '../components/charts/HorizonPerformanceChart';
 import { formatNumber, formatPercent } from '../utils/formatters';
 
@@ -122,6 +123,7 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
   };
 
   const sampleTooSmall = headlineKpis.evaluatedMatchesCount < 10;
+  const hasHeadlineEvidence = headlineKpis.evaluatedMatchesCount > 0;
   const within10Strong = headlineKpis.accuracyWithin10Pct >= 80;
   const within10Moderate = headlineKpis.accuracyWithin10Pct >= 50;
   const populatedHorizons = horizonMetrics.filter((row) => row.forecastsCount > 0).length;
@@ -138,7 +140,14 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
     return 'danger';
   };
 
-  const reliabilityPanel = sampleTooSmall
+  const reliabilityPanel = !hasHeadlineEvidence
+    ? {
+        className: 'border-amber-200 dark:border-amber-900/60 bg-amber-50/60 dark:bg-amber-950/20 text-amber-950 dark:text-amber-200',
+        icon: <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />,
+        title: 'Brak potwierdzonych wyników — trafność jeszcze nieoceniona',
+        body: <>Nie mamy jeszcze par prognoza–potwierdzony wynik dla wybranego zakresu. MAE, MAPE i bias pozostają nieobliczone. Liczba zapisanych prognoz nie jest liczbą ocenionych meczów.</>
+      }
+    : sampleTooSmall
     ? {
         className:
           'border-amber-200 dark:border-amber-900/60 bg-amber-50/60 dark:bg-amber-950/20 text-amber-950 dark:text-amber-200',
@@ -209,36 +218,38 @@ export const ForecastAccuracyPage: React.FC<ForecastAccuracyPageProps> = ({
         </select>
       </div>
 
+      <C1LiveStatusPanel />
+
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <MetricCard
           label="MAPE"
-          value={formatPercent(headlineKpis.mape)}
+          value={hasHeadlineEvidence ? formatPercent(headlineKpis.mape) : '—'}
           subtext="Ostatnia prognoza per mecz"
           tooltip="Średni bezwzględny błąd procentowy. Każdy zakończony mecz ma wagę 1."
           highlight={sampleTooSmall ? 'warning' : 'normal'}
         />
         <MetricCard
           label="MAE"
-          value={`${formatNumber(headlineKpis.mae)} osób`}
+          value={hasHeadlineEvidence ? `${formatNumber(headlineKpis.mae)} osób` : '—'}
           subtext="Średni błąd bezwzględny"
           tooltip="Średnia liczba osób, o którą ostatnia prognoza P50 różniła się od rzeczywistej frekwencji."
         />
         <MetricCard
           label="Bias"
-          value={`${headlineKpis.bias > 0 ? '+' : ''}${formatNumber(headlineKpis.bias)}`}
-          subtext={headlineKpis.bias > 0 ? 'Tendencja do zawyżania' : 'Tendencja do zaniżania'}
+          value={hasHeadlineEvidence ? `${headlineKpis.bias > 0 ? '+' : ''}${formatNumber(headlineKpis.bias)}` : '—'}
+          subtext={!hasHeadlineEvidence ? 'Oczekuje na wyniki' : headlineKpis.bias > 0 ? 'Tendencja do zawyżania' : headlineKpis.bias < 0 ? 'Tendencja do zaniżania' : 'Średni podpisany błąd'}
           tooltip="Średni podpisany błąd. Wartość dodatnia oznacza zawyżanie prognozy."
         />
         <MetricCard
           label="W zakresie ±5%"
-          value={formatPercent(headlineKpis.accuracyWithin5Pct)}
+          value={hasHeadlineEvidence ? formatPercent(headlineKpis.accuracyWithin5Pct) : '—'}
           subtext={sampleTooSmall ? 'Wynik wstępny' : 'Ścisły próg'}
           tooltip="Odsetek zakończonych meczów z błędem ostatniej prognozy P50 nie większym niż 5%."
           highlight={accuracyHighlight(headlineKpis.accuracyWithin5Pct)}
         />
         <MetricCard
           label="W zakresie ±10%"
-          value={formatPercent(headlineKpis.accuracyWithin10Pct)}
+          value={hasHeadlineEvidence ? formatPercent(headlineKpis.accuracyWithin10Pct) : '—'}
           subtext={sampleTooSmall ? 'Za mała próba' : within10Strong ? 'Stabilny wynik' : within10Moderate ? 'Wymaga poprawy' : 'Poniżej celu'}
           tooltip="Odsetek zakończonych meczów z błędem ostatniej prognozy P50 nie większym niż 10%."
           highlight={accuracyHighlight(headlineKpis.accuracyWithin10Pct)}
