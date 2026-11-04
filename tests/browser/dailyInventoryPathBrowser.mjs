@@ -140,6 +140,8 @@ try {
 } catch (error) {
   if (page) await page.screenshot({ path: path.join(output, 'failure.png'), fullPage: true }).catch(() => {});
   await writeFile(path.join(output, 'result.json'), JSON.stringify({ status: 'FAIL', fixture_only: true, checks, error: String(error) }, null, 2));
+  const diagnostic = String(error.stack || error).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+  console.log(`::error title=Synthetic daily-path browser contract::${diagnostic}`);
   throw error;
 } finally {
   if (browser) await browser.close();
