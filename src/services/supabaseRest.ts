@@ -9,6 +9,7 @@ const PAGE_SIZE = 1000;
 
 interface FetchRowsOptions {
   select: string;
+  cache?: RequestCache;
   order?: string;
   filters?: Record<string, string>;
   /**
@@ -29,7 +30,7 @@ interface FetchRowsOptions {
  */
 export async function fetchRows<T>(
   table: string,
-  { select, order, filters, includeShadow = false }: FetchRowsOptions
+  { select, order, filters, includeShadow = false, cache }: FetchRowsOptions
 ): Promise<T[]> {
   const rows: T[] = [];
   let offset = 0;
@@ -51,6 +52,7 @@ export async function fetchRows<T>(
     const response = await fetch(
       `${SUPABASE_URL}/rest/v1/${table}?${params.toString()}`,
       {
+        cache,
         headers: {
           apikey: SUPABASE_PUBLISHABLE_KEY,
           Accept: 'application/json',
