@@ -219,7 +219,7 @@ export const IngestionCoveragePanel: React.FC<IngestionCoveragePanelProps> = ({ 
                     <div>{ingestionObservation(row).label}</div>
                     <div>{ingestionObservation(row).at ? formatKickoff(ingestionObservation(row).at) : 'Brak potwierdzonego czasu'}</div>
                   </td>
-                  <td className="py-3 px-4 text-zinc-500 max-w-[320px]">{row.issue_reason || 'Pipeline działa poprawnie.'}</td>
+                  <td className="py-3 px-4 text-zinc-500 max-w-[320px]">{row.issue_reason || 'Brak zgłoszonego problemu; sprawdź czas ostatniej obserwacji.'}</td>
                 </tr>
               ))}
             </tbody>
