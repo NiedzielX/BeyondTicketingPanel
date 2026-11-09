@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/rolling72-ml-preview", "destination": "/index.html" },
+    { "source": "/rolling72-ml-preview/", "destination": "/index.html" },
     { "source": "/rolling72-preview", "destination": "/index.html" },
     { "source": "/rolling72-preview/", "destination": "/index.html" }
   ]

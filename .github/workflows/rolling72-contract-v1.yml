@@ -1,8 +1,13 @@
-name: Rolling72 feed contract v1
+name: Rolling72 feed contracts v1 and v2
 
 on:
   push:
     paths:
+      - 'src/services/rolling72MlForecastService*'
+      - 'src/components/charts/rolling72MlForecastGeometry*'
+      - 'src/components/charts/Rolling72MlForecastChart.tsx'
+      - 'src/pages/Rolling72MlPreviewPage.tsx'
+      - 'public/research/rolling72-shadow-snapshot-v2.json'
       - 'src/services/rolling72ForecastService*'
       - 'src/components/charts/rolling72ForecastGeometry*'
       - 'src/components/charts/Rolling72ForecastChart.tsx'
@@ -15,6 +20,11 @@ on:
       - '.github/workflows/rolling72-contract-v1.yml'
   pull_request:
     paths:
+      - 'src/services/rolling72MlForecastService*'
+      - 'src/components/charts/rolling72MlForecastGeometry*'
+      - 'src/components/charts/Rolling72MlForecastChart.tsx'
+      - 'src/pages/Rolling72MlPreviewPage.tsx'
+      - 'public/research/rolling72-shadow-snapshot-v2.json'
       - 'src/services/rolling72ForecastService*'
       - 'src/components/charts/rolling72ForecastGeometry*'
       - 'src/components/charts/Rolling72ForecastChart.tsx'
@@ -41,6 +51,10 @@ jobs:
         run: node src/services/rolling72ForecastService.test.ts
       - name: Verify genuine anchors and horizon gaps
         run: node src/components/charts/rolling72ForecastGeometry.test.ts
+      - name: Verify separate paired ML feed, genuine values and maturity flags
+        run: |
+          node src/services/rolling72MlForecastService.test.ts
+          node src/components/charts/rolling72MlForecastGeometry.test.ts
 
   browser:
     runs-on: ubuntu-24.04
@@ -64,7 +78,9 @@ jobs:
         env:
           ROLLING72_BROWSER_TOOLS: ${{ runner.temp }}/rolling72-browser-tools
           ROLLING72_BROWSER_OUTPUT: ${{ runner.temp }}/rolling72-browser-output
-        run: node tests/browser/rolling72ForecastBrowser.mjs
+        run: |
+          node tests/browser/rolling72ForecastBrowser.mjs
+          node tests/browser/rolling72MlForecastBrowser.mjs
       - name: Upload genuine snapshot browser evidence
         if: always()
         uses: actions/upload-artifact@v4
