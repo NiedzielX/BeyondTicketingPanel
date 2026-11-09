@@ -156,26 +156,40 @@ test('cross-model partial or different accepted target is rejected', () => {
   assert.throws(() => parseRolling72Feed(data));
 });
 
+test('absent or blank feed configuration returns missing without any fetch or snapshot substitution', async () => {
+  const original = globalThis.fetch;
+  let requests = 0;
+  try {
+    globalThis.fetch = async () => { requests++; throw new Error('Unexpected fetch'); };
+    assert.deepEqual(await fetchRolling72Forecasts(), { status: 'missing' });
+    assert.deepEqual(await fetchRolling72Forecasts(''), { status: 'missing' });
+    assert.deepEqual(await fetchRolling72Forecasts('  '), { status: 'missing' });
+    assert.equal(requests, 0);
+  } finally { globalThis.fetch = original; }
+});
+
 test('missing/HTML/malformed responses cannot return a synthetic or terminal-attendance fallback', async () => {
   const original = globalThis.fetch;
   try {
     globalThis.fetch = async () => new Response('', { status: 404 });
-    assert.deepEqual(await fetchRolling72Forecasts(), { status: 'missing' });
+    assert.deepEqual(await fetchRolling72Forecasts('/explicit-rolling72-feed.json'), { status: 'missing' });
     globalThis.fetch = async () => new Response('<html/>', { headers: { 'content-type': 'text/html' } });
-    assert.deepEqual(await fetchRolling72Forecasts(), { status: 'missing' });
+    assert.deepEqual(await fetchRolling72Forecasts('/explicit-rolling72-feed.json'), { status: 'missing' });
     globalThis.fetch = async () => new Response('{}', { headers: { 'content-type': 'application/json' } });
-    await assert.rejects(fetchRolling72Forecasts());
+    await assert.rejects(fetchRolling72Forecasts('/explicit-rolling72-feed.json'));
   } finally { globalThis.fetch = original; }
 });
 
-test('read-only fetch omits credentials and validates the returned rolling72 contract', async () => {
+test('explicit preview URL fetch omits credentials and validates the returned rolling72 contract', async () => {
   const original = globalThis.fetch;
+  const controller = new AbortController();
   try {
     globalThis.fetch = async (url, options) => {
-      assert.equal(url, '/research/rolling72-shadow-v1.json');
+      assert.equal(url, '/explicit-rolling72-feed.json');
       assert.equal(options?.credentials, 'omit'); assert.equal(options?.cache, 'no-store');
+      assert.equal(options?.signal, controller.signal);
       return new Response(JSON.stringify(fixture()), { headers: { 'content-type': 'application/json' } });
     };
-    assert.equal((await fetchRolling72Forecasts()).status, 'ready');
+    assert.equal((await fetchRolling72Forecasts(' /explicit-rolling72-feed.json ', controller.signal)).status, 'ready');
   } finally { globalThis.fetch = original; }
 });

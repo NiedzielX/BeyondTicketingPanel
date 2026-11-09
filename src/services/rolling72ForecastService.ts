@@ -201,9 +201,11 @@ export function parseRolling72Feed(input: unknown): Rolling72Feed {
 }
 
 export type Rolling72Response = { status: 'ready'; feed: Rolling72Feed } | { status: 'missing' };
-export async function fetchRolling72Forecasts(signal?: AbortSignal): Promise<Rolling72Response> {
-  const configured = import.meta.env?.VITE_ROLLING72_FORECAST_URL;
-  const url = typeof configured === 'string' && configured.trim() ? configured : '/research/rolling72-shadow-v1.json';
+/** Explicit URL is for research previews; ordinary widgets require configuration. */
+export async function fetchRolling72Forecasts(feedUrl?: string, signal?: AbortSignal): Promise<Rolling72Response> {
+  const configured = import.meta.env?.VITE_ROLLING72_FEED_URL;
+  const url = feedUrl === undefined ? (typeof configured === 'string' ? configured.trim() : '') : feedUrl.trim();
+  if (!url) return { status: 'missing' };
   const response = await fetch(url, { signal, credentials: 'omit', cache: 'no-store' });
   if (response.status === 404) return { status: 'missing' };
   if (!response.ok) throw new Error(`Rolling72 feed unavailable (${response.status})`);
