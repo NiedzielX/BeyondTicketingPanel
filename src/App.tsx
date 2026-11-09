@@ -31,8 +31,16 @@ import { HypeChallengerPanel } from './components/research/HypeChallengerPanel';
 import { GrowthOpportunityPanel } from './components/growth/GrowthOpportunityPanel';
 import { GrowthExperimentPanel } from './components/growth/GrowthExperimentPanel';
 import { eventsService } from './services/eventsService';
+import { Rolling72PreviewPage } from './pages/Rolling72PreviewPage';
 
 export default function App() {
+  if (typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/rolling72-preview') {
+    return <Rolling72PreviewPage />;
+  }
+  return <DashboardApp />;
+}
+
+function DashboardApp() {
   const [currentTab, setCurrentTab] = useState<NavItemKey>('overview');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedEventName, setSelectedEventName] = useState<string | undefined>(undefined);

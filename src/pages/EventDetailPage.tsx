@@ -12,6 +12,7 @@ import {
 import { CommercialStatusBadge, SeverityBadge, TrendIndicator } from '../components/common/StatusBadge';
 import { MetricCard } from '../components/common/MetricCard';
 import { SalesForecastChart } from '../components/charts/SalesForecastChart';
+import { Rolling72ForecastChart } from '../components/charts/Rolling72ForecastChart';
 import { ForecastHistoryTable } from '../components/table/ForecastHistoryTable';
 import { SectorPerformancePanel } from '../components/sector/SectorPerformancePanel';
 
@@ -190,11 +191,13 @@ export const EventDetailPage: React.FC<EventDetailPageProps> = ({ eventId, onBac
         </div>
       </div>
 
+      <Rolling72ForecastChart eventId={eventId} />
+
       <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
           <div>
-            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Jak zmienia się zainteresowanie i prognoza</h2>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">Porównujemy zmiany widocznej dostępności miejsc z kolejnymi prognozami frekwencji.</p>
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Historia prognoz końcowej frekwencji</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Każdy punkt P50 pokazuje prognozę wyniku końcowego z chwili wydania. Przyszła dostępność +24/+48/+72 h jest osobnym wynikiem.</p>
           </div>
           {event.currentForecast !== undefined && (
             <div className="text-xs text-zinc-700 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-800 px-3 py-1 rounded border border-zinc-200 dark:border-zinc-700">
