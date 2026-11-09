@@ -41,7 +41,7 @@ export interface Rolling72Feed {
 
 const HOUR_US = 3_600_000_000n;
 const MODEL_NAMES = Object.keys(ROLLING72_MODELS) as Rolling72ModelName[];
-const fail = (field: string): never => { throw new Error(`Invalid rolling72 feed: ${field}`); };
+function fail(field: string): never { throw new Error(`Invalid rolling72 feed: ${field}`); }
 function record(value: unknown, field: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail(field);
   return value as Record<string, unknown>;
