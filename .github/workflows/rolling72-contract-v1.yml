@@ -1,0 +1,91 @@
+name: Rolling72 feed contracts v1 and v2
+
+on:
+  push:
+    paths:
+      - 'src/services/rolling72MlForecastService*'
+      - 'src/components/charts/rolling72MlForecastGeometry*'
+      - 'src/components/charts/Rolling72MlForecastChart.tsx'
+      - 'src/pages/Rolling72MlPreviewPage.tsx'
+      - 'public/research/rolling72-shadow-snapshot-v2.json'
+      - 'src/services/rolling72ForecastService*'
+      - 'src/components/charts/rolling72ForecastGeometry*'
+      - 'src/components/charts/Rolling72ForecastChart.tsx'
+      - 'src/pages/Rolling72PreviewPage.tsx'
+      - 'src/App.tsx'
+      - 'src/pages/EventDetailPage.tsx'
+      - 'tests/browser/rolling72*'
+      - 'public/research/rolling72-shadow-snapshot-v1.json'
+      - 'vercel.json'
+      - '.github/workflows/rolling72-contract-v1.yml'
+  pull_request:
+    paths:
+      - 'src/services/rolling72MlForecastService*'
+      - 'src/components/charts/rolling72MlForecastGeometry*'
+      - 'src/components/charts/Rolling72MlForecastChart.tsx'
+      - 'src/pages/Rolling72MlPreviewPage.tsx'
+      - 'public/research/rolling72-shadow-snapshot-v2.json'
+      - 'src/services/rolling72ForecastService*'
+      - 'src/components/charts/rolling72ForecastGeometry*'
+      - 'src/components/charts/Rolling72ForecastChart.tsx'
+      - 'src/pages/Rolling72PreviewPage.tsx'
+      - 'src/App.tsx'
+      - 'src/pages/EventDetailPage.tsx'
+      - 'tests/browser/rolling72*'
+      - 'public/research/rolling72-shadow-snapshot-v1.json'
+      - 'vercel.json'
+      - '.github/workflows/rolling72-contract-v1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify immutable rolling72 feed clocks and missingness
+        run: node src/services/rolling72ForecastService.test.ts
+      - name: Verify genuine anchors and horizon gaps
+        run: node src/components/charts/rolling72ForecastGeometry.test.ts
+      - name: Verify separate paired ML feed, genuine values and maturity flags
+        run: |
+          node src/services/rolling72MlForecastService.test.ts
+          node src/components/charts/rolling72MlForecastGeometry.test.ts
+
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install app dependencies
+        run: npm install
+      - name: TypeScript and production build
+        run: |
+          npm run lint
+          npm run build
+      - name: Install isolated browser tooling
+        run: |
+          npm install --prefix "$RUNNER_TEMP/rolling72-browser-tools" --no-save --package-lock=false playwright@1.56.1
+          "$RUNNER_TEMP/rolling72-browser-tools/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Verify actual snapshot route and fail-closed widget
+        env:
+          ROLLING72_BROWSER_TOOLS: ${{ runner.temp }}/rolling72-browser-tools
+          ROLLING72_BROWSER_OUTPUT: ${{ runner.temp }}/rolling72-browser-output
+        run: |
+          node tests/browser/rolling72ForecastBrowser.mjs
+          node tests/browser/rolling72MlForecastBrowser.mjs
+      - name: Upload genuine snapshot browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: genuine-rolling72-browser-contract-${{ github.run_id }}
+          path: ${{ runner.temp }}/rolling72-browser-output
+          if-no-files-found: ignore
+          retention-days: 14
